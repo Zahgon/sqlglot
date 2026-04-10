@@ -3275,10 +3275,19 @@ class DuckDBGenerator(generator.Generator):
 
         Snowflake: REDUCE(array, init, lambda)
         DuckDB:    list_reduce(array, lambda, init)
+
+        Note: Spark's AGGREGATE has an optional 'finish' parameter that
+        DuckDB's list_reduce does not support.
         """
         array_arg = expression.this
         initial_value = expression.args.get("initial")  # 2nd arg
         merge_lambda = expression.args.get("merge")  # 3rd arg
+        finish_lambda = expression.args.get("finish")  # 4th arg (Spark AGGREGATE only)
+
+        # DuckDB doesn't support finish parameter
+        if finish_lambda:
+            self.unsupported("REDUCE with finish parameter is not supported in DuckDB")
+            return self.function_fallback_sql(expression)
 
         # Detect unsupported array accumulator pattern
         if isinstance(initial_value, exp.Array) and merge_lambda:
