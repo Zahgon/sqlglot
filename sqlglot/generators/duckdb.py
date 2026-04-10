@@ -3266,6 +3266,44 @@ class DuckDBGenerator(generator.Generator):
             exp.replace_placeholders(self.ARRAY_EXCEPT_SET_TEMPLATE, arr1=arr1, arr2=arr2)
         )
 
+    def reduce_sql(self, expression: exp.Reduce) -> str:
+        """
+        Transpile Snowflake REDUCE to DuckDB list_reduce.
+
+        DuckDB requires initial_value type to match list element type.
+        Snowflake allows different types (e.g., array accumulator for scalar elements).
+
+        Snowflake: REDUCE(array, init, lambda)
+        DuckDB:    list_reduce(array, lambda, init)
+        """
+        array_arg = expression.this
+        initial_value = expression.args.get("initial")  # 2nd arg
+        merge_lambda = expression.args.get("merge")  # 3rd arg
+
+        # Detect unsupported array accumulator pattern
+        if isinstance(initial_value, exp.Array) and merge_lambda:
+            lambda_body = merge_lambda.this
+            if lambda_body and any(
+                lambda_body.find(cls)
+                for cls in (
+                    exp.ArrayPrepend,
+                    exp.ArrayAppend,
+                    exp.ArrayConcat,
+                    exp.ArrayConstructCompact,
+                )
+            ):
+                self.unsupported(
+                    "REDUCE with array accumulator is not supported in DuckDB. "
+                    "DuckDB requires initial value type to match list element type."
+                )
+                return self.function_fallback_sql(expression)
+
+        if merge_lambda:
+            merge_lambda.set("colon", True)
+
+        # DuckDB parameter order: (array, lambda, initial)
+        return self.func("list_reduce", array_arg, merge_lambda, initial_value)
+
     def arrayslice_sql(self, expression: exp.ArraySlice) -> str:
         """
         Transpiles Snowflake's ARRAY_SLICE (0-indexed, exclusive end) to DuckDB's

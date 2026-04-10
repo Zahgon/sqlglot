@@ -6767,3 +6767,26 @@ FROM SEMANTIC_VIEW(
                     prefix = natural + join_side + outer + " DIRECTED"
                     with self.subTest(f"Testing {prefix} JOIN"):
                         self.validate_identity(f"SELECT * FROM a {prefix} JOIN b USING (id)")
+
+    def test_reduce(self):
+        self.validate_all(
+            "SELECT REDUCE([1, 2, 3], 0, (acc, x) -> acc + x)",
+            write={
+                "snowflake": "SELECT REDUCE([1, 2, 3], 0, (acc, x) -> acc + x)",
+                "duckdb": "SELECT LIST_REDUCE([1, 2, 3], LAMBDA acc, x : acc + x, 0)",
+            },
+        )
+        self.validate_all(
+            "SELECT REDUCE(nums, 0, (s, x) -> s + x) FROM t",
+            write={
+                "snowflake": "SELECT REDUCE(nums, 0, (s, x) -> s + x) FROM t",
+                "duckdb": "SELECT LIST_REDUCE(nums, LAMBDA s, x : s + x, 0) FROM t",
+            },
+        )
+        self.validate_all(
+            "SELECT REDUCE([1, 2, 3, 4], [], (acc, val) -> ARRAY_PREPEND(val, acc))",
+            write={
+                "snowflake": "SELECT REDUCE([1, 2, 3, 4], [], (acc, val) -> ARRAY_PREPEND(val, acc))",
+                "duckdb": UnsupportedError,
+            },
+        )
