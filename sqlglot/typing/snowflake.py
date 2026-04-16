@@ -17,12 +17,7 @@ MAX_SCALE = 37
 
 
 def _annotate_reverse(self: TypeAnnotator, expression: exp.Reverse) -> exp.Reverse:
-    expression = self._annotate_by_args(expression, "this")
-    if expression.is_type(exp.DType.NULL):
-        # Snowflake treats REVERSE(NULL) as a VARCHAR
-        self._set_type(expression, exp.DType.VARCHAR)
-
-    return expression
+    pass
 
 
 def _annotate_timestamp_from_parts(
@@ -32,23 +27,11 @@ def _annotate_timestamp_from_parts(
     TIMESTAMP_FROM_PARTS with time_zone -> TIMESTAMPTZ
     TIMESTAMP_FROM_PARTS without time_zone -> TIMESTAMP (defaults to TIMESTAMP_NTZ)
     """
-    if expression.args.get("zone"):
-        self._set_type(expression, exp.DType.TIMESTAMPTZ)
-    else:
-        self._set_type(expression, exp.DType.TIMESTAMP)
-
-    return expression
+    pass
 
 
 def _annotate_date_or_time_add(self: TypeAnnotator, expression: exp.Expr) -> exp.Expr:
-    if (
-        expression.this.is_type(exp.DType.DATE)
-        and expression.text("unit").upper() not in DATE_PARTS
-    ):
-        self._set_type(expression, exp.DType.TIMESTAMPNTZ)
-    else:
-        self._annotate_by_args(expression, "this")
-    return expression
+    pass
 
 
 def _annotate_decode_case(self: TypeAnnotator, expression: exp.DecodeCase) -> exp.DecodeCase:
@@ -58,34 +41,11 @@ def _annotate_decode_case(self: TypeAnnotator, expression: exp.DecodeCase) -> ex
     We only look at the return values (ret1, ret2, ..., default) to determine the type,
     not the comparison values (val1, val2, ...) or the expression being compared.
     """
-    expressions = expression.expressions
-
-    # Return values are at indices 2, 4, 6, ... and the last element (if even length)
-    # DECODE(expr, val1, ret1, val2, ret2, ..., default)
-    return_types = [expressions[i].type for i in range(2, len(expressions), 2)]
-
-    # If the total number of expressions is even, the last one is the default
-    # Example:
-    #   DECODE(x, 1, 'a', 2, 'b')             -> len=5 (odd), no default
-    #   DECODE(x, 1, 'a', 2, 'b', 'default')  -> len=6 (even), has default
-    if len(expressions) % 2 == 0:
-        return_types.append(expressions[-1].type)
-
-    # Determine the common type from all return values
-    last_type = None
-    for ret_type in return_types:
-        last_type = self._maybe_coerce(last_type or ret_type, ret_type)
-
-    self._set_type(expression, last_type)
-    return expression
+    pass
 
 
 def _annotate_arg_max_min(self, expression):
-    self._set_type(
-        expression,
-        exp.DType.ARRAY if expression.args.get("count") else expression.this.type,
-    )
-    return expression
+    pass
 
 
 def _annotate_within_group(self: TypeAnnotator, expression: exp.WithinGroup) -> exp.WithinGroup:
@@ -94,18 +54,7 @@ def _annotate_within_group(self: TypeAnnotator, expression: exp.WithinGroup) -> 
     1) Annotate args first
     2) Check if this is PercentileDisc/PercentileCont and if so, re-annotate its type to match the ordered expression's type
     """
-
-    if (
-        isinstance(expression.this, (exp.PercentileDisc, exp.PercentileCont))
-        and isinstance(order_expr := expression.expression, exp.Order)
-        and len(order_expr.expressions) == 1
-        and isinstance(ordered_expr := order_expr.expressions[0], exp.Ordered)
-    ):
-        self._set_type(expression, ordered_expr.this.type)
-    else:
-        self._set_type(expression, expression.this.type)
-
-    return expression
+    pass
 
 
 def _annotate_median(self: TypeAnnotator, expression: exp.Median) -> exp.Median:
@@ -115,33 +64,7 @@ def _annotate_median(self: TypeAnnotator, expression: exp.Median) -> exp.Median:
     - If the expr is FLOAT/DOUBLE -> annotate as DOUBLE (FLOAT is a synonym for DOUBLE)
     - If the expr is NUMBER(p, s) -> annotate as NUMBER(min(p+3, 38), min(s+3, 37))
     """
-    # First annotate the argument to get its type
-    expression = self._annotate_by_args(expression, "this")
-
-    # Get the input type
-    input_type = expression.this.type
-
-    if input_type.is_type(exp.DType.DOUBLE):
-        # If input is FLOAT/DOUBLE, return DOUBLE (FLOAT is normalized to DOUBLE in Snowflake)
-        self._set_type(expression, exp.DType.DOUBLE)
-    else:
-        # If input is NUMBER(p, s), return NUMBER(min(p+3, 38), min(s+3, 37))
-        exprs = input_type.expressions
-
-        precision_expr = seq_get(exprs, 0)
-        precision = precision_expr.this.to_py() if precision_expr else MAX_PRECISION
-
-        scale_expr = seq_get(exprs, 1)
-        scale = scale_expr.this.to_py() if scale_expr else 0
-
-        new_precision = min(precision + 3, MAX_PRECISION)
-        new_scale = min(scale + 3, MAX_SCALE)
-
-        # Build the new NUMBER type
-        new_type = exp.DataType.build(f"NUMBER({new_precision}, {new_scale})", dialect="snowflake")
-        self._set_type(expression, new_type)
-
-    return expression
+    pass
 
 
 def _annotate_variance(self: TypeAnnotator, expression: exp.Expr) -> exp.Expr:
@@ -153,33 +76,7 @@ def _annotate_variance(self: TypeAnnotator, expression: exp.Expr) -> exp.Expr:
     - INT, NUMBER(p, 0) -> NUMBER(38, 6)
     - NUMBER(p, s) -> NUMBER(38, max(12, s))
     """
-    # First annotate the argument to get its type
-    expression = self._annotate_by_args(expression, "this")
-
-    # Get the input type
-    input_type = expression.this.type
-
-    # Special case: DECFLOAT -> DECFLOAT(38)
-    if input_type.is_type(exp.DType.DECFLOAT):
-        self._set_type(expression, exp.DataType.build("DECFLOAT", dialect="snowflake"))
-    # Special case: FLOAT/DOUBLE -> DOUBLE
-    elif input_type.is_type(exp.DType.FLOAT, exp.DType.DOUBLE):
-        self._set_type(expression, exp.DType.DOUBLE)
-    # For NUMBER types: determine the scale
-    else:
-        exprs = input_type.expressions
-        scale_expr = seq_get(exprs, 1)
-        scale = scale_expr.this.to_py() if scale_expr else 0
-
-        # If scale is 0 (INT, BIGINT, NUMBER(p,0)): return NUMBER(38, 6)
-        # Otherwise, Snowflake appears to assign scale through the formula MAX(12, s)
-        new_scale = 6 if scale == 0 else max(12, scale)
-
-        # Build the new NUMBER type
-        new_type = exp.DataType.build(f"NUMBER({MAX_PRECISION}, {new_scale})", dialect="snowflake")
-        self._set_type(expression, new_type)
-
-    return expression
+    pass
 
 
 def _annotate_kurtosis(self: TypeAnnotator, expression: exp.Kurtosis) -> exp.Kurtosis:
@@ -190,19 +87,7 @@ def _annotate_kurtosis(self: TypeAnnotator, expression: exp.Kurtosis) -> exp.Kur
     - DOUBLE or FLOAT input -> DOUBLE
     - Other numeric types (INT, NUMBER) -> NUMBER(38, 12)
     """
-    expression = self._annotate_by_args(expression, "this")
-    input_type = expression.this.type
-
-    if input_type.is_type(exp.DType.DECFLOAT):
-        self._set_type(expression, exp.DataType.build("DECFLOAT", dialect="snowflake"))
-    elif input_type.is_type(exp.DType.FLOAT, exp.DType.DOUBLE):
-        self._set_type(expression, exp.DType.DOUBLE)
-    else:
-        self._set_type(
-            expression, exp.DataType.build(f"NUMBER({MAX_PRECISION}, 12)", dialect="snowflake")
-        )
-
-    return expression
+    pass
 
 
 def _annotate_math_with_float_decfloat(self: TypeAnnotator, expression: exp.Expr) -> exp.Expr:
@@ -213,26 +98,12 @@ def _annotate_math_with_float_decfloat(self: TypeAnnotator, expression: exp.Expr
     - For integer types (INT, BIGINT, etc.) -> return DOUBLE
     - For other numeric types (NUMBER, DECIMAL, DOUBLE) -> return DOUBLE
     """
-    expression = self._annotate_by_args(expression, "this")
-
-    # If input is DECFLOAT, preserve
-    if expression.this.is_type(exp.DType.DECFLOAT):
-        self._set_type(expression, expression.this.type)
-    else:
-        # For all other types (integers, decimals, etc.), return DOUBLE
-        self._set_type(expression, exp.DType.DOUBLE)
-
-    return expression
+    pass
 
 
 def _annotate_str_to_time(self: TypeAnnotator, expression: exp.StrToTime) -> exp.StrToTime:
     # target_type is stored as a DataType instance
-    target_type_arg = expression.args.get("target_type")
-    target_type = (
-        target_type_arg.this if isinstance(target_type_arg, exp.DataType) else exp.DType.TIMESTAMP
-    )
-    self._set_type(expression, target_type)
-    return expression
+    pass
 
 
 EXPRESSION_METADATA = {

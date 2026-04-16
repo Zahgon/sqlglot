@@ -91,13 +91,7 @@ class Spark2Parser(HiveParser):
     }
 
     def _parse_drop_column(self) -> exp.Drop | exp.Command | None:
-        return (
-            self.expression(exp.Drop(this=self._parse_schema(), kind="COLUMNS"))
-            if self._match_text_seq("DROP", "COLUMNS")
-            else None
-        )
+        pass
 
     def _pivot_column_names(self, aggregations: list[exp.Expr]) -> list[str]:
-        if len(aggregations) == 1:
-            return []
-        return pivot_column_names(aggregations, dialect="spark")
+        pass

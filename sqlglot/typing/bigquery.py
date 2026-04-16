@@ -76,72 +76,11 @@ def _annotate_by_args_approx_top(self: TypeAnnotator, expression: exp.ApproxTopK
 
 
 def _annotate_concat(self: TypeAnnotator, expression: exp.Concat) -> exp.Concat:
-    annotated = self._annotate_by_args(expression, "expressions")
-
-    # Args must be BYTES or types that can be cast to STRING, return type is either BYTES or STRING
-    # https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat
-    if not annotated.is_type(exp.DType.BINARY, exp.DType.UNKNOWN):
-        self._set_type(annotated, exp.DType.VARCHAR)
-
-    return annotated
+    pass
 
 
 def _annotate_array(self: TypeAnnotator, expression: exp.Array) -> exp.Array:
-    array_args = expression.expressions
-
-    # BigQuery behaves as follows:
-    #
-    # SELECT t, TYPEOF(t) FROM (SELECT 'foo') AS t            -- foo, STRUCT<STRING>
-    # SELECT ARRAY(SELECT 'foo'), TYPEOF(ARRAY(SELECT 'foo')) -- foo, ARRAY<STRING>
-    # ARRAY(SELECT ... UNION ALL SELECT ...) -- ARRAY<type from coerced projections>
-    if len(array_args) == 1:
-        unnested = array_args[0].unnest()
-        projection_type: exp.DataType | exp.DType | None = None
-
-        # Handle ARRAY(SELECT ...) - single SELECT query
-        if isinstance(unnested, exp.Select):
-            if (
-                (query_type := unnested.meta.get("query_type")) is not None
-                and query_type.is_type(exp.DType.STRUCT)
-                and len(query_type.expressions) == 1
-                and isinstance(col_def := query_type.expressions[0], exp.ColumnDef)
-                and (col_type := col_def.kind) is not None
-                and not col_type.is_type(exp.DType.UNKNOWN)
-            ):
-                projection_type = col_type
-
-        # Handle ARRAY(SELECT ... UNION ALL SELECT ...) - set operations
-        elif isinstance(unnested, exp.SetOperation):
-            # Get all column types for the SetOperation
-            col_types = self._get_setop_column_types(unnested)
-            # For ARRAY constructor, there should only be one projection
-            # https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array
-            if col_types and unnested.left.selects:
-                first_col_name = unnested.left.selects[0].alias_or_name
-                projection_type = col_types.get(first_col_name)
-
-        # If we successfully determine a projection type and it's not UNKNOWN, wrap it in ARRAY
-        if projection_type and not (
-            (
-                isinstance(projection_type, exp.DataType)
-                and projection_type.is_type(exp.DType.UNKNOWN)
-            )
-            or projection_type == exp.DType.UNKNOWN
-        ):
-            element_type = (
-                projection_type.copy()
-                if isinstance(projection_type, exp.DataType)
-                else exp.DataType(this=projection_type)
-            )
-            array_type = exp.DataType(
-                this=exp.DType.ARRAY,
-                expressions=[element_type],
-                nested=True,
-            )
-            self._set_type(expression, array_type)
-            return expression
-
-    return self._annotate_by_args(expression, "expressions", array=True)
+    pass
 
 
 EXPRESSION_METADATA = {

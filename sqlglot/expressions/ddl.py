@@ -17,14 +17,12 @@ class DDL(Selectable):
     @property
     def ctes(self) -> list[CTE]:
         """Returns a list of all the CTEs attached to this statement."""
-        with_ = self.args.get("with_")
-        return with_.expressions if with_ else []
+        pass
 
     @property
     def selects(self) -> list[Expr]:
         """If this statement contains a query (e.g. a CTAS), this returns the query's projections."""
-        expression = self.expression
-        return expression.selects if isinstance(expression, Query) else []
+        pass
 
     @property
     def named_selects(self) -> list[str]:
@@ -32,8 +30,7 @@ class DDL(Selectable):
         If this statement contains a query (e.g. a CTAS), this returns the output
         names of the query's projections.
         """
-        expression = self.expression
-        return expression.named_selects if isinstance(expression, Query) else []
+        pass
 
 
 class Create(Expression, DDL):
@@ -388,7 +385,7 @@ class Alter(Expression):
 
     @property
     def actions(self) -> list[Expr]:
-        return self.args.get("actions") or []
+        pass
 
 
 class AlterSession(Expression):
@@ -408,7 +405,7 @@ class Execute(Expression):
 
     @property
     def name(self) -> str:
-        return self.this.name
+        pass
 
 
 class ExecuteSql(Execute):

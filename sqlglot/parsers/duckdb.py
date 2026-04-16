@@ -19,44 +19,27 @@ from collections.abc import Collection
 
 
 def _build_sort_array_desc(args: list) -> exp.Expr:
-    return exp.SortArray(this=seq_get(args, 0), asc=exp.false())
+    pass
 
 
 def _build_array_prepend(args: list) -> exp.Expr:
-    return exp.ArrayPrepend(this=seq_get(args, 1), expression=seq_get(args, 0))
+    pass
 
 
 def _build_date_diff(args: list) -> exp.Expr:
-    return exp.DateDiff(this=seq_get(args, 2), expression=seq_get(args, 1), unit=seq_get(args, 0))
+    pass
 
 
 def _build_generate_series(end_exclusive: bool = False) -> t.Callable[[list], exp.GenerateSeries]:
     def _builder(args: list) -> exp.GenerateSeries:
         # Check https://duckdb.org/docs/sql/functions/nested.html#range-functions
-        if len(args) == 1:
-            # DuckDB uses 0 as a default for the series' start when it's omitted
-            args.insert(0, exp.Literal.number("0"))
-
-        gen_series = exp.GenerateSeries.from_arg_list(args)
-        gen_series.set("is_end_exclusive", end_exclusive)
-
-        return gen_series
+        pass
 
     return _builder
 
 
 def _build_make_timestamp(args: list) -> exp.Expr:
-    if len(args) == 1:
-        return exp.UnixToTime(this=seq_get(args, 0), scale=exp.UnixToTime.MICROS)
-
-    return exp.TimestampFromParts(
-        year=seq_get(args, 0),
-        month=seq_get(args, 1),
-        day=seq_get(args, 2),
-        hour=seq_get(args, 3),
-        min=seq_get(args, 4),
-        sec=seq_get(args, 5),
-    )
+    pass
 
 
 def _show_parser(*args: t.Any, **kwargs: t.Any) -> t.Callable[[DuckDBParser], exp.Show]:
@@ -333,18 +316,11 @@ class DuckDBParser(parser.Parser):
         return self._parse_field_def()
 
     def _pivot_column_names(self, aggregations: list[exp.Expr]) -> list[str]:
-        if len(aggregations) == 1:
-            return super()._pivot_column_names(aggregations)
-        return pivot_column_names(aggregations, dialect="duckdb")
+        pass
 
     def _parse_attach_detach(self, is_attach: bool = True) -> exp.Attach | exp.Detach:
         def _parse_attach_option() -> exp.AttachOption:
-            return self.expression(
-                exp.AttachOption(
-                    this=self._parse_var(any_token=True),
-                    expression=self._parse_field(any_token=True),
-                )
-            )
+            pass
 
         self._match(TokenType.DATABASE)
         exists = self._parse_exists(not_=is_attach)

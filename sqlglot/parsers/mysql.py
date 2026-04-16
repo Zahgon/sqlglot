@@ -21,27 +21,11 @@ TIME_SPECIFIERS = {"f", "H", "h", "I", "i", "k", "l", "p", "r", "S", "s", "T"}
 
 
 def _has_time_specifier(date_format: str) -> bool:
-    i = 0
-    length = len(date_format)
-
-    while i < length:
-        if date_format[i] == "%":
-            i += 1
-            if i < length and date_format[i] in TIME_SPECIFIERS:
-                return True
-        i += 1
-    return False
+    pass
 
 
 def _str_to_date(args: list) -> exp.StrToDate | exp.StrToTime:
-    mysql_date_format = seq_get(args, 1)
-    date_format = Dialect["mysql"].format_time(mysql_date_format)
-    this = seq_get(args, 0)
-
-    if mysql_date_format and _has_time_specifier(mysql_date_format.name):
-        return exp.StrToTime(this=this, format=date_format)
-
-    return exp.StrToDate(this=this, format=date_format)
+    pass
 
 
 def _show_parser(*args: t.Any, **kwargs: t.Any) -> t.Callable[[MySQLParser], exp.Show]:
@@ -322,13 +306,7 @@ class MySQLParser(parser.Parser):
         return this
 
     def _parse_primary_key_part(self) -> exp.Expr | None:
-        this = self._parse_id_var()
-        if not self._match(TokenType.L_PAREN):
-            return this
-
-        expression = self._parse_number()
-        self._match_r_paren()
-        return self.expression(exp.ColumnPrefix(this=this, expression=expression))
+        pass
 
     def _parse_index_constraint(self, kind: str | None = None) -> exp.IndexColumnConstraint:
         if kind:
@@ -543,31 +521,10 @@ class MySQLParser(parser.Parser):
         )
 
     def _parse_partition_range_value(self) -> exp.Expr | None:
-        self._match_text_seq("PARTITION")
-        name = self._parse_id_var()
-
-        if not self._match_text_seq("VALUES", "LESS", "THAN"):
-            return name
-
-        values = self._parse_wrapped_csv(self._parse_expression)
-
-        if (
-            len(values) == 1
-            and isinstance(values[0], exp.Column)
-            and values[0].name.upper() == "MAXVALUE"
-        ):
-            values = [exp.var("MAXVALUE")]
-
-        part_range = self.expression(exp.PartitionRange(this=name, expressions=values))
-        return self.expression(exp.Partition(expressions=[part_range]))
+        pass
 
     def _parse_partition_list_value(self) -> exp.Partition:
-        self._match_text_seq("PARTITION")
-        name = self._parse_id_var()
-        self._match_text_seq("VALUES", "IN")
-        values = self._parse_wrapped_csv(self._parse_expression)
-        part_list = self.expression(exp.PartitionList(this=name, expressions=values))
-        return self.expression(exp.Partition(expressions=[part_list]))
+        pass
 
     def _parse_primary_key(
         self,

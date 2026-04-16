@@ -21,56 +21,11 @@ from sqlglot.tokens import TokenType
 
 def _transform_create(expression: exp.Expr) -> exp.Expr:
     """Move primary key to a column and enforce auto_increment on primary keys."""
-    schema = expression.this
-
-    if isinstance(expression, exp.Create) and isinstance(schema, exp.Schema):
-        defs = {}
-        primary_key = None
-
-        for e in schema.expressions:
-            if isinstance(e, exp.ColumnDef):
-                defs[e.name] = e
-            elif isinstance(e, exp.PrimaryKey):
-                primary_key = e
-
-        if primary_key and len(primary_key.expressions) == 1:
-            column = defs[primary_key.expressions[0].name]
-            column.append(
-                "constraints", exp.ColumnConstraint(kind=exp.PrimaryKeyColumnConstraint())
-            )
-            schema.expressions.remove(primary_key)
-        else:
-            for column in defs.values():
-                auto_increment = None
-                for constraint in column.constraints:
-                    if isinstance(constraint.kind, exp.PrimaryKeyColumnConstraint):
-                        break
-                    if isinstance(constraint.kind, exp.AutoIncrementColumnConstraint):
-                        auto_increment = constraint
-                if auto_increment:
-                    column.constraints.remove(auto_increment)
-
-    return expression
+    pass
 
 
 def _generated_to_auto_increment(expression: exp.Expr) -> exp.Expr:
-    if not isinstance(expression, exp.ColumnDef):
-        return expression
-
-    generated = expression.find(exp.GeneratedAsIdentityColumnConstraint)
-
-    if generated:
-        t.cast(exp.ColumnConstraint, generated.parent).pop()
-
-        not_null = expression.find(exp.NotNullColumnConstraint)
-        if not_null:
-            t.cast(exp.ColumnConstraint, not_null.parent).pop()
-
-        expression.append(
-            "constraints", exp.ColumnConstraint(kind=exp.AutoIncrementColumnConstraint())
-        )
-
-    return expression
+    pass
 
 
 class SQLiteGenerator(generator.Generator):
@@ -183,28 +138,19 @@ class SQLiteGenerator(generator.Generator):
     LIMIT_FETCH = "LIMIT"
 
     def bitwiseandagg_sql(self, expression: exp.BitwiseAndAgg) -> str:
-        self.unsupported("BITWISE_AND aggregation is not supported in SQLite")
-        return self.function_fallback_sql(expression)
+        pass
 
     def bitwiseoragg_sql(self, expression: exp.BitwiseOrAgg) -> str:
-        self.unsupported("BITWISE_OR aggregation is not supported in SQLite")
-        return self.function_fallback_sql(expression)
+        pass
 
     def bitwisexoragg_sql(self, expression: exp.BitwiseXorAgg) -> str:
-        self.unsupported("BITWISE_XOR aggregation is not supported in SQLite")
-        return self.function_fallback_sql(expression)
+        pass
 
     def jsonextract_sql(self, expression: exp.JSONExtract) -> str:
-        if expression.expressions:
-            return self.function_fallback_sql(expression)
-        return arrow_json_extract_sql(self, expression)
+        pass
 
     def dateadd_sql(self, expression: exp.DateAdd) -> str:
-        modifier = expression.expression
-        modifier = modifier.name if modifier.is_string else self.sql(modifier)
-        unit = expression.args.get("unit")
-        modifier = f"'{modifier} {unit.name}'" if unit else f"'{modifier}'"
-        return self.func("DATE", expression.this, modifier)
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         if expression.is_type("date"):
@@ -218,49 +164,13 @@ class SQLiteGenerator(generator.Generator):
     # so every use of TRUNC is affected. Modeling precisely would require exp.FloatTrunc.
     @unsupported_args("decimals")
     def trunc_sql(self, expression: exp.Trunc) -> str:
-        return self.func("TRUNC", expression.this)
+        pass
 
     def generateseries_sql(self, expression: exp.GenerateSeries) -> str:
-        parent = expression.parent
-        alias = parent and parent.args.get("alias")
-
-        if isinstance(alias, exp.TableAlias) and alias.columns:
-            column_alias = alias.columns[0]
-            alias.set("columns", None)
-            sql = self.sql(
-                exp.select(exp.alias_("value", column_alias)).from_(expression).subquery()
-            )
-        else:
-            sql = self.function_fallback_sql(expression)
-
-        return sql
+        pass
 
     def datediff_sql(self, expression: exp.DateDiff) -> str:
-        unit = expression.args.get("unit")
-        unit = unit.name.upper() if unit else "DAY"
-
-        sql = f"(JULIANDAY({self.sql(expression, 'this')}) - JULIANDAY({self.sql(expression, 'expression')}))"
-
-        if unit == "MONTH":
-            sql = f"{sql} / 30.0"
-        elif unit == "YEAR":
-            sql = f"{sql} / 365.0"
-        elif unit == "HOUR":
-            sql = f"{sql} * 24.0"
-        elif unit == "MINUTE":
-            sql = f"{sql} * 1440.0"
-        elif unit == "SECOND":
-            sql = f"{sql} * 86400.0"
-        elif unit == "MILLISECOND":
-            sql = f"{sql} * 86400000.0"
-        elif unit == "MICROSECOND":
-            sql = f"{sql} * 86400000000.0"
-        elif unit == "NANOSECOND":
-            sql = f"{sql} * 8640000000000.0"
-        else:
-            self.unsupported(f"DATEDIFF unsupported for '{unit}'.")
-
-        return f"CAST({sql} AS INTEGER)"
+        pass
 
     # https://www.sqlite.org/lang_aggfunc.html#group_concat
     def groupconcat_sql(self, expression: exp.GroupConcat) -> str:
@@ -282,41 +192,26 @@ class SQLiteGenerator(generator.Generator):
         return f"GROUP_CONCAT({distinct_sql}{self.format_args(this, separator)})"
 
     def least_sql(self, expression: exp.Least) -> str:
-        if expression.expressions:
-            return rename_func("MIN")(self, expression)
-
-        return self.sql(expression, "this")
+        pass
 
     def greatest_sql(self, expression: exp.Greatest) -> str:
-        if expression.expressions:
-            return rename_func("MAX")(self, expression)
-
-        return self.sql(expression, "this")
+        pass
 
     def transaction_sql(self, expression: exp.Transaction) -> str:
-        this = expression.this
-        this = f" {this}" if this else ""
-        return f"BEGIN{this} TRANSACTION"
+        pass
 
     def isascii_sql(self, expression: exp.IsAscii) -> str:
-        return f"(NOT {self.sql(expression.this)} GLOB CAST(x'2a5b5e012d7f5d2a' AS TEXT))"
+        pass
 
     @unsupported_args("this")
     def currentschema_sql(self, expression: exp.CurrentSchema) -> str:
-        return "'main'"
+        pass
 
     def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
-        self.unsupported("SQLite does not support IGNORE NULLS.")
-        return self.sql(expression.this)
+        pass
 
     def respectnulls_sql(self, expression: exp.RespectNulls) -> str:
-        return self.sql(expression.this)
+        pass
 
     def windowspec_sql(self, expression: exp.WindowSpec) -> str:
-        if (
-            expression.text("kind").upper() == "RANGE"
-            and expression.text("start").upper() == "CURRENT ROW"
-        ):
-            return "RANGE CURRENT ROW"
-
-        return super().windowspec_sql(expression)
+        pass

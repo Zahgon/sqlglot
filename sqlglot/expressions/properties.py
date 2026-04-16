@@ -627,15 +627,7 @@ class Properties(Expression):
 
     @classmethod
     def from_dict(cls, properties_dict: dict) -> Properties:
-        expressions = []
-        for key, value in properties_dict.items():
-            property_cls = cls.NAME_TO_PROPERTY.get(key.upper())
-            if property_cls:
-                expressions.append(property_cls(this=convert(value)))
-            else:
-                expressions.append(Property(this=Literal.string(key), value=convert(value)))
-
-        return cls(expressions=expressions)
+        pass
 
 
 # TODO (mypyc)

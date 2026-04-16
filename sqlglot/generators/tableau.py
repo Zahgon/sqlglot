@@ -35,10 +35,7 @@ class TableauGenerator(generator.Generator):
         return f"IF {this} THEN {true} ELSE {false} END"
 
     def count_sql(self, expression: exp.Count) -> str:
-        this = expression.this
-        if isinstance(this, exp.Distinct):
-            return self.func("COUNTD", *this.expressions)
-        return self.func("COUNT", this)
+        pass
 
     def strposition_sql(self, expression: exp.StrPosition) -> str:
         has_occurrence = "occurrence" in expression.args

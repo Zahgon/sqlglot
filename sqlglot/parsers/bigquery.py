@@ -17,29 +17,15 @@ if t.TYPE_CHECKING:
 
 
 def _build_contains_substring(args: list) -> exp.Contains:
-    this = exp.Lower(this=seq_get(args, 0))
-    expr = exp.Lower(this=seq_get(args, 1))
-    return exp.Contains(this=this, expression=expr, json_scope=seq_get(args, 2))
+    pass
 
 
 def _build_date(args: list) -> exp.Date | exp.DateFromParts:
-    expr_type = exp.DateFromParts if len(args) == 3 else exp.Date
-    return expr_type.from_arg_list(args)
+    pass
 
 
 def build_date_diff(args: list) -> exp.Expr:
-    expr = exp.DateDiff(
-        this=seq_get(args, 0),
-        expression=seq_get(args, 1),
-        unit=seq_get(args, 2),
-        date_part_boundary=True,
-    )
-
-    unit = expr.args.get("unit")
-    if isinstance(unit, exp.Var) and unit.name.upper() == "WEEK":
-        expr.set("unit", exp.WeekStart(this=exp.var("SUNDAY")))
-
-    return expr
+    pass
 
 
 def _build_datetime(args: list) -> exp.Func:
@@ -54,89 +40,47 @@ def _build_extract_json_with_default_path(
     expr_type: type[E],
 ) -> t.Callable:
     def _builder(args: list, dialect: t.Any) -> E:
-        if len(args) == 1:
-            args.append(exp.Literal.string("$"))
-        return parser.build_extract_json_with_path(expr_type)(args, dialect)
+        pass
 
     return _builder
 
 
 def _build_format_time(expr_type: type[exp.Expr]) -> t.Callable[[list], exp.TimeToStr]:
     def _builder(args: list) -> exp.TimeToStr:
-        formatted_time = build_formatted_time(exp.TimeToStr, "bigquery")(
-            [expr_type(this=seq_get(args, 1)), seq_get(args, 0)]
-        )
-        formatted_time.set("zone", seq_get(args, 2))
-        return formatted_time
+        pass
 
     return _builder
 
 
 def _build_json_strip_nulls(args: list) -> exp.JSONStripNulls:
-    expression = exp.JSONStripNulls(this=seq_get(args, 0))
-    for arg in args[1:]:
-        if isinstance(arg, exp.Kwarg):
-            expression.set(arg.this.name.lower(), arg)
-        else:
-            expression.set("expression", arg)
-    return expression
+    pass
 
 
 def _build_levenshtein(args: list) -> exp.Levenshtein:
-    max_dist = seq_get(args, 2)
-    return exp.Levenshtein(
-        this=seq_get(args, 0),
-        expression=seq_get(args, 1),
-        max_dist=max_dist.expression if max_dist else None,
-    )
+    pass
 
 
 def _build_parse_timestamp(args: list) -> exp.StrToTime:
-    this = build_formatted_time(exp.StrToTime, "bigquery")([seq_get(args, 1), seq_get(args, 0)])
-    this.set("zone", seq_get(args, 2))
-    return this
+    pass
 
 
 def _build_regexp_extract(expr_type: type[E], default_group: exp.Expr | None = None) -> t.Callable:
     def _builder(args: list, dialect: t.Any) -> E:
-        try:
-            group = re.compile(args[1].name).groups == 1
-        except re.error:
-            group = False
-
-        return expr_type(
-            this=seq_get(args, 0),
-            expression=seq_get(args, 1),
-            position=seq_get(args, 2),
-            occurrence=seq_get(args, 3),
-            group=exp.Literal.number(1) if group else default_group,
-            **(
-                {"null_if_pos_overflow": dialect.REGEXP_EXTRACT_POSITION_OVERFLOW_RETURNS_NULL}
-                if expr_type is exp.RegexpExtract
-                else {}
-            ),
-        )
+        pass
 
     return _builder
 
 
 def _build_time(args: list) -> exp.Func:
-    if len(args) == 1:
-        return exp.TsOrDsToTime(this=args[0])
-    if len(args) == 2:
-        return exp.Time.from_arg_list(args)
-    return exp.TimeFromParts.from_arg_list(args)
+    pass
 
 
 def _build_timestamp(args: list) -> exp.Timestamp:
-    timestamp = exp.Timestamp.from_arg_list(args)
-    timestamp.set("with_tz", True)
-    return timestamp
+    pass
 
 
 def _build_to_hex(args: list) -> exp.Hex | exp.MD5:
-    arg = seq_get(args, 0)
-    return exp.MD5(this=arg.this) if isinstance(arg, exp.MD5Digest) else exp.LowerHex(this=arg)
+    pass
 
 
 MAKE_INTERVAL_KWARGS = ["year", "month", "day", "hour", "minute", "second"]

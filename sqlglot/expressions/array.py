@@ -262,11 +262,7 @@ class Unnest(Expression, Func, UDTF):
 
     @property
     def selects(self) -> list[Expr]:
-        columns = super().selects
-        offset = self.args.get("offset")
-        if offset:
-            columns = columns + [to_identifier("offset") if offset is True else offset]
-        return columns
+        pass
 
 
 # Map

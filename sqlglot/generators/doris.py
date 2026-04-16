@@ -12,12 +12,7 @@ from sqlglot.generators.mysql import MySQLGenerator
 
 
 def _lag_lead_sql(self, expression: exp.Lag | exp.Lead) -> str:
-    return self.func(
-        "LAG" if isinstance(expression, exp.Lag) else "LEAD",
-        expression.this,
-        expression.args.get("offset") or exp.Literal.number(1),
-        expression.args.get("default") or exp.null(),
-    )
+    pass
 
 
 class DorisGenerator(MySQLGenerator):
@@ -559,50 +554,19 @@ class DorisGenerator(MySQLGenerator):
     def uniquekeyproperty_sql(
         self, expression: exp.UniqueKeyProperty, prefix: str = "UNIQUE KEY"
     ) -> str:
-        create_stmt = expression.find_ancestor(exp.Create)
-        if create_stmt and create_stmt.args["properties"].find(exp.MaterializedProperty):
-            return super().uniquekeyproperty_sql(expression, prefix="KEY")
-
-        return super().uniquekeyproperty_sql(expression)
+        pass
 
     def partitionrange_sql(self, expression: exp.PartitionRange) -> str:
-        name = self.sql(expression, "this")
-        values = expression.expressions
-
-        if len(values) != 1:
-            # Multiple values: use VALUES [ ... )
-            if values and isinstance(values[0], list):
-                values_sql = ", ".join(
-                    f"({', '.join(self.sql(v) for v in inner)})" for inner in values
-                )
-            else:
-                values_sql = ", ".join(f"({self.sql(v)})" for v in values)
-
-            return f"PARTITION {name} VALUES [{values_sql})"
-
-        return f"PARTITION {name} VALUES LESS THAN ({self.sql(values[0])})"
+        pass
 
     def partitionbyrangepropertydynamic_sql(
         self, expression: exp.PartitionByRangePropertyDynamic
     ) -> str:
         # Generates: FROM ("start") TO ("end") INTERVAL N UNIT
-        start = self.sql(expression, "start")
-        end = self.sql(expression, "end")
-        every = expression.args.get("every")
-
-        if every:
-            number = self.sql(every, "this")
-            interval = f"INTERVAL {number} {self.sql(every, 'unit')}"
-        else:
-            interval = ""
-
-        return f"FROM ({start}) TO ({end}) {interval}"
+        pass
 
     def partitionedbyproperty_sql(self, expression: exp.PartitionedByProperty) -> str:
-        this = expression.this
-        if isinstance(this, exp.Schema):
-            return f"PARTITION BY ({self.expressions(this, flat=True)})"
-        return f"PARTITION BY ({self.sql(this)})"
+        pass
 
     def table_sql(self, expression: exp.Table, sep: str = " AS ") -> str:
         """Override table_sql to avoid AS keyword in UPDATE and DELETE statements."""

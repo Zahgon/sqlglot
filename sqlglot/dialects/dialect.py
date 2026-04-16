@@ -152,11 +152,7 @@ class _Dialect(type):
 
     @property
     def classes(cls):
-        if len(DIALECT_MODULE_NAMES) != len(cls._classes):
-            for key in DIALECT_MODULE_NAMES:
-                cls._try_load(key)
-
-        return cls._classes
+        pass
 
     @classmethod
     def _try_load(cls, key: str | Dialects) -> None:
@@ -280,14 +276,7 @@ class _Dialect(type):
         )[0]
 
         def get_start_end(token_type: TokenType) -> tuple[str | None, str | None]:
-            return next(
-                (
-                    (s, e)
-                    for s, (e, t) in klass.tokenizer_class._FORMAT_STRINGS.items()
-                    if t == token_type
-                ),
-                (None, None),
-            )
+            pass
 
         klass.BIT_START, klass.BIT_END = get_start_end(TokenType.BIT_STRING)
         klass.HEX_START, klass.HEX_END = get_start_end(TokenType.HEX_STRING)
@@ -1041,15 +1030,7 @@ class Dialect(metaclass=_Dialect):
 
     def case_sensitive(self, text: str) -> bool:
         """Checks if text contains any case sensitive characters, based on the dialect's rules."""
-        if self.normalization_strategy is NormalizationStrategy.CASE_INSENSITIVE:
-            return False
-
-        unsafe = (
-            str.islower
-            if self.normalization_strategy is NormalizationStrategy.UPPERCASE
-            else str.isupper
-        )
-        return any(unsafe(char) for char in text)
+        pass
 
     def can_quote(self, identifier: exp.Identifier, identify: str | bool = "safe") -> bool:
         """Checks if an identifier can be quoted
@@ -1064,25 +1045,7 @@ class Dialect(metaclass=_Dialect):
         Returns:
             Whether the given text can be identified.
         """
-        if identifier.quoted:
-            return True
-        if not identify:
-            return False
-        if isinstance(identifier.parent, exp.Func):
-            return False
-        if identify is True:
-            return True
-
-        is_safe = not self.case_sensitive(identifier.this) and bool(
-            exp.SAFE_IDENTIFIER_RE.match(identifier.this)
-        )
-
-        if identify == "safe":
-            return is_safe
-        if identify == "unsafe":
-            return not is_safe
-
-        raise ValueError(f"Unexpected argument for identify: '{identify}'")
+        pass
 
     def quote_identifier(self, expression: E, identify: bool = True) -> E:
         """
@@ -1093,9 +1056,7 @@ class Dialect(metaclass=_Dialect):
             identify: If set to `False`, the quotes will only be added if the identifier is deemed
                 "unsafe", with respect to its characters and this dialect's normalization strategy.
         """
-        if isinstance(expression, exp.Identifier):
-            expression.set("quoted", self.can_quote(expression, identify or "unsafe"))
-        return expression
+        pass
 
     def to_json_path(self, path: exp.Expr | None) -> exp.Expr | None:
         if isinstance(path, exp.Literal):
@@ -1184,12 +1145,7 @@ def if_sql(
     name: str = "IF", false_value: exp.Expr | str | None = None
 ) -> t.Callable[[Generator, exp.If], str]:
     def _if_sql(self: Generator, expression: exp.If) -> str:
-        return self.func(
-            name,
-            expression.this,
-            expression.args.get("true"),
-            expression.args.get("false") or false_value,
-        )
+        pass
 
     return _if_sql
 
@@ -1332,32 +1288,7 @@ def array_append_sql(
     """
 
     def _array_append_sql(self: Generator, expression: exp.ArrayAppend | exp.ArrayPrepend) -> str:
-        this = expression.this
-        element = expression.expression
-        args = [element, this] if swap_params else [this, element]
-        func_sql = self.func(name, *args)
-
-        source_null_propagation = bool(expression.args.get("null_propagation"))
-        target_null_propagation = self.dialect.ARRAY_FUNCS_PROPAGATES_NULLS
-
-        # No transpilation needed when source and target have matching NULL semantics
-        if source_null_propagation == target_null_propagation:
-            return func_sql
-
-        # Source propagates NULLs, target doesn't: wrap in conditional to return NULL explicitly
-        if source_null_propagation:
-            return self.sql(
-                exp.If(
-                    this=exp.Is(this=this, expression=exp.Null()),
-                    true=exp.Null(),
-                    false=func_sql,
-                )
-            )
-
-        # Source doesn't propagate NULLs, target does: use COALESCE to convert NULL to empty array
-        this = exp.Coalesce(expressions=[this, exp.Array(expressions=[])])
-        args = [element, this] if swap_params else [this, element]
-        return self.func(name, *args)
+        pass
 
     return _array_append_sql
 
@@ -1366,17 +1297,7 @@ def generate_series_sql(
     func_name: str, exclusive_func_name: str | None = None
 ) -> t.Callable[[Generator, exp.GenerateSeries], str]:
     def _generate_series_sql(self: Generator, expression: exp.GenerateSeries) -> str:
-        start = expression.args.get("start")
-        end = expression.args.get("end")
-        step = expression.args.get("step")
-
-        if expression.args.get("is_end_exclusive"):
-            if exclusive_func_name:
-                return self.func(exclusive_func_name, start, end, step)
-            adjusted_end = exp.Sub(this=end, expression=exp.Literal.number(1))
-            return self.func(func_name, start, adjusted_end, step)
-
-        return self.func(func_name, start, end, step)
+        pass
 
     return _generate_series_sql
 
@@ -1414,51 +1335,7 @@ def array_concat_sql(
             return result
 
     def _array_concat_sql(self: Generator, expression: exp.ArrayConcat) -> str:
-        this = expression.this
-        exprs = expression.expressions
-        all_args = [this] + exprs
-
-        source_null_propagation = bool(expression.args.get("null_propagation"))
-        target_null_propagation = self.dialect.ARRAY_FUNCS_PROPAGATES_NULLS
-
-        # Skip wrapper when source and target have matching NULL semantics,
-        # or when the first argument is an array literal (which can never be NULL),
-        # or when it's a single-argument call (empty array is added, preserving NULL semantics)
-        if (
-            source_null_propagation == target_null_propagation
-            or isinstance(this, exp.Array)
-            or len(exprs) == 0
-        ):
-            return _build_func_call(self, name, all_args)
-
-        # Case 1: Source propagates NULLs, target doesn't (Snowflake → DuckDB)
-        # Check if ANY argument is NULL and return NULL explicitly
-        if source_null_propagation:
-            # Build OR-chain: a IS NULL OR b IS NULL OR c IS NULL
-            null_checks: list[exp.Expr] = [
-                exp.Is(this=arg.copy(), expression=exp.Null()) for arg in all_args
-            ]
-            combined_check: exp.Expr = reduce(
-                lambda a, b: exp.Or(this=a, expression=b), null_checks
-            )
-
-            func_sql = _build_func_call(self, name, all_args)
-
-            return self.sql(
-                exp.If(
-                    this=combined_check,
-                    true=exp.Null(),
-                    false=func_sql,
-                )
-            )
-
-        # Case 2: Source doesn't propagate NULLs, target does (DuckDB → Snowflake)
-        # Wrap ALL arguments in COALESCE to convert NULL → empty array
-        wrapped_args = [
-            exp.Coalesce(expressions=[arg.copy(), exp.Array(expressions=[])]) for arg in all_args
-        ]
-
-        return _build_func_call(self, name, wrapped_args)
+        pass
 
     return _array_concat_sql
 
@@ -1549,13 +1426,7 @@ def build_formatted_time(
     """
 
     def _builder(args: BuilderArgs) -> E:
-        return exp_class(
-            this=seq_get(args, 0),
-            format=Dialect[dialect].format_time(
-                seq_get(args, 1)
-                or (Dialect[dialect].TIME_FORMAT if default is True else default or None)
-            ),
-        )
+        pass
 
     return _builder
 
@@ -1568,8 +1439,7 @@ def time_format(
         Returns the time format for a given expression, unless it's equivalent
         to the default time format of the dialect of interest.
         """
-        time_format = self.format_time(expression)
-        return time_format if time_format != Dialect.get_or_raise(dialect).TIME_FORMAT else None
+        pass
 
     return _time_format
 
@@ -1581,17 +1451,7 @@ def build_date_delta(
     supports_timezone: bool = False,
 ) -> t.Callable[[BuilderArgs], E]:
     def _builder(args: BuilderArgs) -> E:
-        unit_based = len(args) >= 3
-        has_timezone = len(args) == 4
-        this = args[2] if unit_based else seq_get(args, 0)
-        unit = None
-        if unit_based or default_unit:
-            unit = args[0] if unit_based else exp.Literal.string(default_unit)
-            unit = exp.var(unit_mapping.get(unit.name.lower(), unit.name)) if unit_mapping else unit
-        expression = exp_class(this=this, expression=seq_get(args, 1), unit=unit)
-        if supports_timezone and has_timezone:
-            expression.set("zone", args[-1])
-        return expression
+        pass
 
     return _builder
 
@@ -1600,15 +1460,7 @@ def build_date_delta_with_interval(
     expression_class: Type[E],
 ) -> t.Callable[[BuilderArgs], E | None]:
     def _builder(args: BuilderArgs) -> E | None:
-        if len(args) < 2:
-            return None
-
-        interval = args[1]
-
-        if not isinstance(interval, exp.Interval):
-            raise ParseError(f"INTERVAL expression expected but got '{interval}'")
-
-        return expression_class(this=args[0], expression=interval.this, unit=unit_to_str(interval))
+        pass
 
     return _builder
 
@@ -1635,10 +1487,7 @@ def timestamptrunc_sql(
     func: str = "DATE_TRUNC", zone: bool = False
 ) -> t.Callable[[Generator, exp.TimestampTrunc], str]:
     def _timestamptrunc_sql(self: Generator, expression: exp.TimestampTrunc) -> str:
-        args = [unit_to_str(expression), expression.this]
-        if zone:
-            args.append(expression.args.get("zone"))
-        return self.func(func, *args)
+        pass
 
     return _timestamptrunc_sql
 
@@ -1913,7 +1762,7 @@ def generatedasidentitycolumnconstraint_sql(
 def arg_max_or_min_no_count(name: str) -> t.Callable[[Generator, exp.ArgMax | exp.ArgMin], str]:
     @unsupported_args("count")
     def _arg_max_or_min_sql(self: Generator, expression: exp.ArgMax | exp.ArgMin) -> str:
-        return self.func(name, expression.this, expression.expression)
+        pass
 
     return _arg_max_or_min_sql
 
@@ -1933,15 +1782,7 @@ def ts_or_ds_add_cast(expression: exp.TsOrDsAdd) -> exp.TsOrDsAdd:
 
 def date_delta_sql(name: str, cast: bool = False) -> t.Callable[[Generator, DATE_ADD_OR_DIFF], str]:
     def _delta_sql(self: Generator, expression: DATE_ADD_OR_DIFF) -> str:
-        if cast and isinstance(expression, exp.TsOrDsAdd):
-            expression = ts_or_ds_add_cast(expression)
-
-        return self.func(
-            name,
-            unit_to_var(expression),
-            expression.expression,
-            expression.this,
-        )
+        pass
 
     return _delta_sql
 
@@ -1950,28 +1791,7 @@ def date_delta_to_binary_interval_op(
     cast: bool = True,
 ) -> t.Callable[[Generator, DATETIME_DELTA], str]:
     def date_delta_to_binary_interval_op_sql(self: Generator, expression: DATETIME_DELTA) -> str:
-        this = expression.this
-        unit = unit_to_var(expression)
-        op = "+" if isinstance(expression, DATETIME_ADD) else "-"
-
-        to_type: exp.DATA_TYPE | None = None
-        if cast:
-            if isinstance(expression, exp.TsOrDsAdd):
-                to_type = expression.return_type
-            elif this.is_string:
-                # Cast string literals (i.e function parameters) to the appropriate type for +/- interval to work
-                to_type = (
-                    exp.DType.DATETIME
-                    if isinstance(expression, (exp.DatetimeAdd, exp.DatetimeSub))
-                    else exp.DType.DATE
-                )
-
-        this = exp.cast(this, to_type) if to_type else this
-
-        expr = expression.expression
-        interval = expr if isinstance(expr, exp.Interval) else exp.Interval(this=expr, unit=unit)
-
-        return f"{self.sql(this)} {op} {self.sql(interval)}"
+        pass
 
     return date_delta_to_binary_interval_op_sql
 
@@ -2070,36 +1890,7 @@ def build_json_extract_path(
     json_type: str | None = None,
 ) -> t.Callable[[MutableSequence[t.Any]], F]:
     def _builder(args: MutableSequence[t.Any]) -> F:
-        segments: list[exp.JSONPathPart] = [exp.JSONPathRoot()]
-        for arg in args[1:]:
-            if not isinstance(arg, exp.Literal):
-                # We use the fallback parser because we can't really transpile non-literals safely
-                return expr_type.from_arg_list(args)
-
-            text = arg.name
-            if is_int(text) and (not arrow_req_json_type or not arg.is_string):
-                index = int(text)
-                segments.append(
-                    exp.JSONPathSubscript(this=index if zero_based_indexing else index - 1)
-                )
-            else:
-                segments.append(exp.JSONPathKey(this=text))
-
-        # This is done to avoid failing in the expression validator due to the arg count
-        del args[2:]
-        kwargs = {
-            "this": seq_get(args, 0),
-            "expression": exp.JSONPath(expressions=segments),
-        }
-
-        is_jsonb = issubclass(expr_type, (exp.JSONBExtract, exp.JSONBExtractScalar))
-        if not is_jsonb:
-            kwargs["only_json_types"] = arrow_req_json_type
-
-        if json_type is not None:
-            kwargs["json_type"] = json_type
-
-        return expr_type(**kwargs)
+        pass
 
     return _builder
 
@@ -2108,29 +1899,7 @@ def json_extract_segments(
     name: str, quoted_index: bool = True, op: str | None = None
 ) -> t.Callable[[Generator, JSON_EXTRACT_TYPE], str]:
     def _json_extract_segments(self: Generator, expression: JSON_EXTRACT_TYPE) -> str:
-        path = expression.expression
-        if not isinstance(path, exp.JSONPath):
-            return rename_func(name)(self, expression)
-
-        escape = path.args.get("escape")
-
-        segments = []
-        for segment in path.expressions:
-            path = self.sql(segment)
-            if path:
-                if isinstance(segment, exp.JSONPathPart) and (
-                    quoted_index or not isinstance(segment, exp.JSONPathSubscript)
-                ):
-                    if escape:
-                        path = self.escape_str(path)
-
-                    path = f"{self.dialect.QUOTE_START}{path}{self.dialect.QUOTE_END}"
-
-                segments.append(path)
-
-        if op:
-            return f" {op} ".join([self.sql(expression.this), *segments])
-        return self.func(name, expression.this, *segments)
+        pass
 
     return _json_extract_segments
 
@@ -2225,22 +1994,13 @@ def build_default_decimal_type(
     precision: int | None = None, scale: int | None = None
 ) -> t.Callable[[exp.DataType], exp.DataType]:
     def _builder(dtype: exp.DataType) -> exp.DataType:
-        if dtype.expressions or precision is None:
-            return dtype
-
-        params = f"{precision}{f', {scale}' if scale is not None else ''}"
-        return exp.DataType.build(f"DECIMAL({params})")
+        pass
 
     return _builder
 
 
 def build_timestamp_from_parts(args: BuilderArgs) -> exp.Func:
-    if len(args) == 2:
-        # Other dialects don't have the TIMESTAMP_FROM_PARTS(date, time) concept,
-        # so we parse this into Anonymous for now instead of introducing complexity
-        return exp.Anonymous(this="TIMESTAMP_FROM_PARTS", expressions=args)
-
-    return exp.TimestampFromParts.from_arg_list(args)
+    pass
 
 
 def sha256_sql(self: Generator, expression: exp.SHA2) -> str:
@@ -2301,15 +2061,7 @@ def sequence_sql(self: Generator, expression: exp.GenerateSeries | exp.GenerateD
 
 def build_like(expr_type: Type[E], not_like: bool = False) -> t.Callable[[BuilderArgs], exp.Expr]:
     def _builder(args: BuilderArgs) -> exp.Expr:
-        like_expr: exp.Expr = expr_type(this=seq_get(args, 0), expression=seq_get(args, 1))
-
-        if escape := seq_get(args, 2):
-            like_expr = exp.Escape(this=like_expr, expression=escape)
-
-        if not_like:
-            like_expr = exp.Not(this=like_expr)
-
-        return like_expr
+        pass
 
     return _builder
 
@@ -2321,17 +2073,7 @@ def build_regexp_extract(expr_type: Type[E]) -> t.Callable[[BuilderArgs, Dialect
         # length. If true, returns NULL. If false, returns an empty string. `null_if_pos_overflow` is
         # only needed for exp.RegexpExtract - exp.RegexpExtractAll always returns an empty array if
         # position overflows.
-        return expr_type(
-            this=seq_get(args, 0),
-            expression=seq_get(args, 1),
-            group=seq_get(args, 2) or exp.Literal.number(dialect.REGEXP_EXTRACT_DEFAULT_GROUP),
-            parameters=seq_get(args, 3),
-            **(
-                {"null_if_pos_overflow": dialect.REGEXP_EXTRACT_POSITION_OVERFLOW_RETURNS_NULL}
-                if expr_type is exp.RegexpExtract
-                else {}
-            ),
-        )
+        pass
 
     return _builder
 
@@ -2505,12 +2247,6 @@ def getbit_sql(self: Generator, expression: exp.Getbit) -> str:
 
 def jarowinkler_similarity(func: str) -> t.Callable[[Generator, exp.JarowinklerSimilarity], str]:
     def jarowinklersimilarity_sql(self: Generator, expression: exp.JarowinklerSimilarity) -> str:
-        this = expression.this
-        expr = expression.expression
-        if expression.args.get("case_insensitive"):
-            this = exp.Upper(this=this)
-            expr = exp.Upper(this=expr)
-
-        return self.func(func, this, expr)
+        pass
 
     return jarowinklersimilarity_sql

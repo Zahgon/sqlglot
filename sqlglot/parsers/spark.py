@@ -24,32 +24,11 @@ def _build_datediff(args: list) -> exp.Expr:
     - https://docs.databricks.com/sql/language-manual/functions/datediff3.html
     - https://docs.databricks.com/sql/language-manual/functions/datediff.html
     """
-    unit = None
-    this = seq_get(args, 0)
-    expression = seq_get(args, 1)
-
-    if len(args) == 3:
-        unit = exp.var(t.cast(exp.Expr, this).name)
-        this = args[2]
-
-    return exp.DateDiff(
-        this=exp.TsOrDsToDate(this=this), expression=exp.TsOrDsToDate(this=expression), unit=unit
-    )
+    pass
 
 
 def _build_dateadd(args: list) -> exp.Expr:
-    expression = seq_get(args, 1)
-
-    if len(args) == 2:
-        # DATE_ADD(startDate, numDays INTEGER)
-        # https://docs.databricks.com/en/sql/language-manual/functions/date_add.html
-        return exp.TsOrDsAdd(
-            this=seq_get(args, 0), expression=expression, unit=exp.Literal.string("DAY")
-        )
-
-    # DATE_ADD / DATEADD / TIMESTAMPADD(unit, value integer, expr)
-    # https://docs.databricks.com/en/sql/language-manual/functions/date_add3.html
-    return exp.TimestampAdd(this=seq_get(args, 2), expression=expression, unit=seq_get(args, 0))
+    pass
 
 
 class SparkParser(Spark2Parser):
@@ -141,5 +120,4 @@ class SparkParser(Spark2Parser):
     def _parse_pivot_aggregation(self) -> exp.Expr | None:
         # Spark 3+ and Databricks support non aggregate functions in PIVOT too, e.g
         # PIVOT (..., 'foo' AS bar FOR col_to_pivot IN (...))
-        aggregate_expr = self._parse_function() or self._parse_disjunction()
-        return self._parse_alias(aggregate_expr)
+        pass

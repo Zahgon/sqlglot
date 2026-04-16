@@ -364,17 +364,7 @@ class Update(Expression, DML):
             copy: if `False`, modify this expression instance in-place.
             opts: other options to use to parse the input expressions.
         """
-        return _apply_list_builder(
-            *expressions,
-            instance=self,
-            arg="expressions",
-            append=append,
-            into=Expr,
-            prefix=None,
-            dialect=dialect,
-            copy=copy,
-            **opts,
-        )
+        pass
 
     def where(
         self,

@@ -18,20 +18,11 @@ from sqlglot.transforms import (
 
 
 def _map_sql(self: Spark2Generator, expression: exp.Map) -> str:
-    keys = expression.args.get("keys")
-    values = expression.args.get("values")
-
-    if not keys or not values:
-        return self.func("MAP")
-
-    return self.func("MAP_FROM_ARRAYS", keys, values)
+    pass
 
 
 def _str_to_date(self: Spark2Generator, expression: exp.StrToDate) -> str:
-    time_format = self.format_time(expression)
-    if time_format == HIVE_DATE_FORMAT:
-        return self.func("TO_DATE", expression.this)
-    return self.func("TO_DATE", expression.this, time_format)
+    pass
 
 
 def _unix_to_time_sql(self: Spark2Generator, expression: exp.UnixToTime) -> str:
@@ -62,19 +53,7 @@ def _unalias_pivot(expression: exp.Expr) -> exp.Expr:
         >>> print(_unalias_pivot(expr).sql(dialect="spark"))
         SELECT piv.x FROM (SELECT * FROM tbl PIVOT(SUM(a) FOR b IN ('x'))) AS piv
     """
-    if isinstance(expression, exp.From) and expression.this.args.get("pivots"):
-        pivot = expression.this.args["pivots"][0]
-        if pivot.alias:
-            alias = pivot.args["alias"].pop()
-            return exp.From(
-                this=expression.this.replace(
-                    exp.select("*")
-                    .from_(expression.this.copy(), copy=False)
-                    .subquery(alias=alias, copy=False)
-                )
-            )
-
-    return expression
+    pass
 
 
 def _unqualify_pivot_columns(expression: exp.Expr) -> exp.Expr:
@@ -88,12 +67,7 @@ def _unqualify_pivot_columns(expression: exp.Expr) -> exp.Expr:
         >>> print(_unqualify_pivot_columns(expr).sql(dialect="spark"))
         SELECT * FROM tbl PIVOT(SUM(tbl.sales) FOR quarter IN ('Q1', 'Q2'))
     """
-    if isinstance(expression, exp.Pivot):
-        expression.set(
-            "fields", [transforms.unqualify_columns(field) for field in expression.fields]
-        )
-
-    return expression
+    pass
 
 
 def temporary_storage_provider(expression: exp.Expr) -> exp.Expr:
@@ -206,9 +180,7 @@ class Spark2Generator(HiveGenerator):
     CREATE_FUNCTION_RETURN_AS = False
 
     def struct_sql(self, expression: exp.Struct) -> str:
-        from sqlglot.generator import Generator
-
-        return Generator.struct_sql(self, expression)
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         arg = expression.this
@@ -227,26 +199,13 @@ class Spark2Generator(HiveGenerator):
         return super(HiveGenerator, self).cast_sql(expression, safe_prefix=safe_prefix)
 
     def fileformatproperty_sql(self, expression: exp.FileFormatProperty) -> str:
-        if expression.args.get("hive_format"):
-            return super().fileformatproperty_sql(expression)
-
-        return f"USING {expression.name.upper()}"
+        pass
 
     def altercolumn_sql(self, expression: exp.AlterColumn) -> str:
-        this = self.sql(expression, "this")
-        new_name = self.sql(expression, "rename_to") or this
-        comment = self.sql(expression, "comment")
-        if new_name == this:
-            if comment:
-                return f"ALTER COLUMN {this} COMMENT {comment}"
-            return super(HiveGenerator, self).altercolumn_sql(expression)
-        return f"RENAME COLUMN {this} TO {new_name}"
+        pass
 
     def renamecolumn_sql(self, expression: exp.RenameColumn) -> str:
-        return super(HiveGenerator, self).renamecolumn_sql(expression)
+        pass
 
     def bracket_sql(self, expression: exp.Bracket) -> str:
-        if expression.args.get("safe") is False:
-            return bracket_to_element_at_sql(self, expression)
-
-        return super().bracket_sql(expression)
+        pass

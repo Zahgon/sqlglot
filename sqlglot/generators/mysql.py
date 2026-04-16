@@ -28,33 +28,13 @@ from collections import defaultdict
 
 
 def _date_trunc_sql(self: MySQLGenerator, expression: exp.DateTrunc) -> str:
-    expr = self.sql(expression, "this")
-    unit = expression.text("unit").upper()
-
-    if unit == "WEEK":
-        concat = f"CONCAT(YEAR({expr}), ' ', WEEK({expr}, 1), ' 1')"
-        date_format = "%Y %u %w"
-    elif unit == "MONTH":
-        concat = f"CONCAT(YEAR({expr}), ' ', MONTH({expr}), ' 1')"
-        date_format = "%Y %c %e"
-    elif unit == "QUARTER":
-        concat = f"CONCAT(YEAR({expr}), ' ', QUARTER({expr}) * 3 - 2, ' 1')"
-        date_format = "%Y %c %e"
-    elif unit == "YEAR":
-        concat = f"CONCAT(YEAR({expr}), ' 1 1')"
-        date_format = "%Y %c %e"
-    else:
-        if unit != "DAY":
-            self.unsupported(f"Unexpected interval unit: {unit}")
-        return self.func("DATE", expr)
-
-    return self.func("STR_TO_DATE", concat, f"'{date_format}'")
+    pass
 
 
 def _str_to_date_sql(
     self: MySQLGenerator, expression: exp.StrToDate | exp.StrToTime | exp.TsOrDsToDate
 ) -> str:
-    return self.func("STR_TO_DATE", expression.this, self.format_time(expression))
+    pass
 
 
 def _unix_to_time_sql(self: MySQLGenerator, expression: exp.UnixToTime) -> str:
@@ -85,8 +65,7 @@ def date_add_sql(
 
 
 def _ts_or_ds_to_date_sql(self: MySQLGenerator, expression: exp.TsOrDsToDate) -> str:
-    time_format = expression.args.get("format")
-    return _str_to_date_sql(self, expression) if time_format else self.func("DATE", expression.this)
+    pass
 
 
 def _remove_ts_or_ds_to_date(
@@ -589,59 +568,28 @@ class MySQLGenerator(generator.Generator):
     SQL_SECURITY_VIEW_LOCATION = exp.Properties.Location.POST_CREATE
 
     def locate_properties(self, properties: exp.Properties) -> defaultdict:
-        locations = super().locate_properties(properties)
-
-        # MySQL puts SQL SECURITY before VIEW but after the schema for functions/procedures
-        if isinstance(create := properties.parent, exp.Create) and create.kind == "VIEW":
-            post_schema = locations[exp.Properties.Location.POST_SCHEMA]
-            for i, p in enumerate(post_schema):
-                if isinstance(p, exp.SqlSecurityProperty):
-                    post_schema.pop(i)
-                    locations[self.SQL_SECURITY_VIEW_LOCATION].append(p)
-                    break
-
-        return locations
+        pass
 
     def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
-        persisted = "STORED" if expression.args.get("persisted") else "VIRTUAL"
-        return f"GENERATED ALWAYS AS ({self.sql(expression.this.unnest())}) {persisted}"
+        pass
 
     def array_sql(self, expression: exp.Array) -> str:
-        self.unsupported("Arrays are not supported by MySQL")
-        return self.function_fallback_sql(expression)
+        pass
 
     def arraycontainsall_sql(self, expression: exp.ArrayContainsAll) -> str:
-        self.unsupported("Array operations are not supported by MySQL")
-        return self.function_fallback_sql(expression)
+        pass
 
     def dpipe_sql(self, expression: exp.DPipe) -> str:
-        return self.func("CONCAT", *expression.flatten())
+        pass
 
     def extract_sql(self, expression: exp.Extract) -> str:
-        unit = expression.name
-        if unit and unit.lower() == "epoch":
-            return self.func("UNIX_TIMESTAMP", expression.expression)
-
-        return super().extract_sql(expression)
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
-        if (
-            self.VARCHAR_REQUIRES_SIZE
-            and expression.is_type(exp.DType.VARCHAR)
-            and not expression.expressions
-        ):
-            # `VARCHAR` must always have a size - if it doesn't, we always generate `TEXT`
-            return "TEXT"
-
-        # https://dev.mysql.com/doc/refman/8.0/en/numeric-type-syntax.html
-        result = super().datatype_sql(expression)
-        if expression.this in self.UNSIGNED_TYPE_MAPPING:
-            result = f"{result} UNSIGNED"
-
-        return result
+        pass
 
     def jsonarraycontains_sql(self, expression: exp.JSONArrayContains) -> str:
-        return f"{self.sql(expression, 'this')} MEMBER OF({self.sql(expression, 'expression')})"
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         if expression.to.this in self.TIMESTAMP_FUNC_TYPES:
@@ -708,15 +656,10 @@ class MySQLGenerator(generator.Generator):
         """To avoid TO keyword in ALTER ... RENAME statements.
         It's moved from Doris, because it's the same for all MySQL, Doris, and StarRocks.
         """
-        return super().alterrename_sql(expression, include_to=False)
+        pass
 
     def altercolumn_sql(self, expression: exp.AlterColumn) -> str:
-        dtype = self.sql(expression, "dtype")
-        if not dtype:
-            return super().altercolumn_sql(expression)
-
-        this = self.sql(expression, "this")
-        return f"MODIFY COLUMN {this} {dtype}"
+        pass
 
     def _prefixed_sql(self, prefix: str, expression: exp.Expr, arg: str) -> str:
         sql = self.sql(expression, arg)
@@ -744,53 +687,38 @@ class MySQLGenerator(generator.Generator):
         return self.sql(dateadd)
 
     def converttimezone_sql(self, expression: exp.ConvertTimezone) -> str:
-        from_tz = expression.args.get("source_tz")
-        to_tz = expression.args.get("target_tz")
-        dt = expression.args.get("timestamp")
-
-        return self.func("CONVERT_TZ", dt, from_tz, to_tz)
+        pass
 
     def attimezone_sql(self, expression: exp.AtTimeZone) -> str:
-        self.unsupported("AT TIME ZONE is not supported by MySQL")
-        return self.sql(expression.this)
+        pass
 
     def isascii_sql(self, expression: exp.IsAscii) -> str:
-        return f"REGEXP_LIKE({self.sql(expression.this)}, '^[[:ascii:]]*$')"
+        pass
 
     def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
         # https://dev.mysql.com/doc/refman/8.4/en/window-function-descriptions.html
-        self.unsupported("MySQL does not support IGNORE NULLS.")
-        return self.sql(expression.this)
+        pass
 
     @unsupported_args("this")
     def currentschema_sql(self, expression: exp.CurrentSchema) -> str:
-        return self.func("SCHEMA")
+        pass
 
     def partition_sql(self, expression: exp.Partition) -> str:
-        parent = expression.parent
-        if isinstance(parent, (exp.PartitionByRangeProperty, exp.PartitionByListProperty)):
-            return self.expressions(expression, flat=True)
-        return super().partition_sql(expression)
+        pass
 
     def _partition_by_sql(
         self, expression: exp.PartitionByRangeProperty | exp.PartitionByListProperty, kind: str
     ) -> str:
-        partitions = self.expressions(expression, key="partition_expressions", flat=True)
-        create = self.expressions(expression, key="create_expressions", flat=True)
-        return f"PARTITION BY {kind} ({partitions}) ({create})"
+        pass
 
     def partitionbyrangeproperty_sql(self, expression: exp.PartitionByRangeProperty) -> str:
-        return self._partition_by_sql(expression, "RANGE")
+        pass
 
     def partitionbylistproperty_sql(self, expression: exp.PartitionByListProperty) -> str:
-        return self._partition_by_sql(expression, "LIST")
+        pass
 
     def partitionlist_sql(self, expression: exp.PartitionList) -> str:
-        name = self.sql(expression, "this")
-        values = self.expressions(expression, flat=True)
-        return f"PARTITION {name} VALUES IN ({values})"
+        pass
 
     def partitionrange_sql(self, expression: exp.PartitionRange) -> str:
-        name = self.sql(expression, "this")
-        values = self.expressions(expression, flat=True)
-        return f"PARTITION {name} VALUES LESS THAN ({values})"
+        pass

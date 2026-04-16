@@ -14,17 +14,7 @@ DATE_DELTA = t.Union[exp.DateAdd, exp.DateSub]
 
 def _date_delta_sql(name: str) -> t.Callable[[DremioGenerator, DATE_DELTA], str]:
     def _delta_sql(self: DremioGenerator, expression: DATE_DELTA) -> str:
-        unit = expression.text("unit").upper()
-
-        # Fallback to default behavior if unit is missing or 'DAY'
-        if not unit or unit == "DAY":
-            return self.func(name, expression.this, expression.expression)
-
-        this_sql = self.sql(expression, "this")
-        expr_sql = self.sql(expression, "expression")
-
-        interval_sql = f"CAST({expr_sql} AS INTERVAL {unit})"
-        return f"{name}({this_sql}, {interval_sql})"
+        pass
 
     return _delta_sql
 
@@ -76,13 +66,7 @@ class DremioGenerator(generator.Generator):
         """
         Reject time-zone-aware TIMESTAMPs, which Dremio does not accept
         """
-        if expression.is_type(
-            exp.DType.TIMESTAMPTZ,
-            exp.DType.TIMESTAMPLTZ,
-        ):
-            self.unsupported("Dremio does not support time-zone-aware TIMESTAMP")
-
-        return super().datatype_sql(expression)
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         # Match: CAST(CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AS DATE)

@@ -38,11 +38,11 @@ class Table:
         self.rows.pop()
 
     def to_pylist(self) -> list:
-        return [dict(zip(self.columns, row)) for row in self.rows]
+        pass
 
     @property
     def width(self) -> int:
-        return len(self.columns)
+        pass
 
     def __len__(self) -> int:
         return len(self.rows)

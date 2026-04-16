@@ -26,29 +26,12 @@ def _eliminate_between_in_delete(expression: exp.Expr) -> exp.Expr:
         >>> print(_eliminate_between_in_delete(expr).sql(dialect="starrocks"))
         DELETE FROM t WHERE x >= 1 AND x <= 10
     """
-    if where := expression.args.get("where"):
-        for between in where.find_all(exp.Between):
-            between.replace(
-                exp.and_(
-                    exp.GTE(this=between.this.copy(), expression=between.args["low"]),
-                    exp.LTE(this=between.this.copy(), expression=between.args["high"]),
-                    copy=False,
-                )
-            )
-    return expression
+    pass
 
 
 # https://docs.starrocks.io/docs/sql-reference/sql-functions/spatial-functions/st_distance_sphere/
 def st_distance_sphere(self, expression: exp.StDistance) -> str:
-    point1 = expression.this
-    point2 = expression.expression
-
-    point1_x = self.func("ST_X", point1)
-    point1_y = self.func("ST_Y", point1)
-    point2_x = self.func("ST_X", point2)
-    point2_y = self.func("ST_Y", point2)
-
-    return self.func("ST_Distance_Sphere", point1_x, point1_y, point2_x, point2_y)
+    pass
 
 
 class StarRocksGenerator(MySQLGenerator):
@@ -267,58 +250,17 @@ class StarRocksGenerator(MySQLGenerator):
 
     def create_sql(self, expression: exp.Create) -> str:
         # Starrocks' primary key is defined outside of the schema, so we need to move it there
-        schema = expression.this
-        if isinstance(schema, exp.Schema):
-            primary_key = schema.find(exp.PrimaryKey)
-
-            if primary_key:
-                props = expression.args.get("properties")
-
-                if not props:
-                    props = exp.Properties(expressions=[])
-                    expression.set("properties", props)
-
-                # Verify if the first one is an engine property. Is true then insert it after the engine,
-                # otherwise insert it at the beginning
-                engine = props.find(exp.EngineProperty)
-                engine_index = (engine.index or 0) if engine else -1
-                props.set("expressions", primary_key.pop(), engine_index + 1, overwrite=False)
-
-        return super().create_sql(expression)
+        pass
 
     def partitionedbyproperty_sql(self, expression: exp.PartitionedByProperty) -> str:
-        this = expression.this
-        if isinstance(this, exp.Schema):
-            # For MVs, StarRocks needs outer parentheses.
-            create = expression.find_ancestor(exp.Create)
-
-            sql = self.expressions(this, flat=True)
-            if (create and create.kind == "VIEW") or all(
-                isinstance(col, (exp.Column, exp.Identifier)) for col in this.expressions
-            ):
-                sql = f"({sql})"
-
-            return f"PARTITION BY {sql}"
-
-        return f"PARTITION BY {self.sql(this)}"
+        pass
 
     def cluster_sql(self, expression: exp.Cluster) -> str:
         """Generate StarRocks ORDER BY clause for clustering."""
-        expressions = self.expressions(expression, flat=True)
-        return f"ORDER BY ({expressions})" if expressions else ""
+        pass
 
     def refreshtriggerproperty_sql(self, expression: exp.RefreshTriggerProperty) -> str:
         """Generate StarRocks REFRESH clause for materialized views.
         There is a little difference of the syntax between StarRocks and Doris.
         """
-        method = self.sql(expression, "method")
-        method = f" {method}" if method else ""
-        kind = self.sql(expression, "kind")
-        kind = f" {kind}" if kind else ""
-        starts = self.sql(expression, "starts")
-        starts = f" START ({starts})" if starts else ""
-        every = self.sql(expression, "every")
-        unit = self.sql(expression, "unit")
-        every = f" EVERY (INTERVAL {every} {unit})" if every and unit else ""
-
-        return f"REFRESH{method}{kind}{starts}{every}"
+        pass

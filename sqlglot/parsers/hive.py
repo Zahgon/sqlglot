@@ -24,19 +24,11 @@ def build_with_ignore_nulls(
 
 
 def _build_to_date(args: list) -> exp.TsOrDsToDate:
-    expr = build_formatted_time(exp.TsOrDsToDate, "hive")(args)
-    expr.set("safe", True)
-    return expr
+    pass
 
 
 def _build_date_add(args: list) -> exp.TsOrDsAdd:
-    expression = seq_get(args, 1)
-    if expression:
-        expression = expression * -1
-
-    return exp.TsOrDsAdd(
-        this=seq_get(args, 0), expression=expression, unit=exp.Literal.string("DAY")
-    )
+    pass
 
 
 class HiveParser(parser.Parser):

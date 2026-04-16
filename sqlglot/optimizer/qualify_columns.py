@@ -116,54 +116,7 @@ def qualify_columns(
 
 def validate_qualify_columns(expression: E, sql: str | None = None) -> E:
     """Raise an `OptimizeError` if any columns aren't qualified"""
-    all_unqualified_columns = []
-    for scope in traverse_scope(expression):
-        if isinstance(scope.expression, exp.Select):
-            unqualified_columns = scope.unqualified_columns
-
-            if scope.external_columns and not scope.is_correlated_subquery and not scope.pivots:
-                column = scope.external_columns[0]
-                for_table = f" for table: '{column.table}'" if column.table else ""
-                line = column.this.meta.get("line")
-                col = column.this.meta.get("col")
-                start = column.this.meta.get("start")
-                end = column.this.meta.get("end")
-
-                error_msg = f"Column '{column.name}' could not be resolved{for_table}."
-                if line and col:
-                    error_msg += f" Line: {line}, Col: {col}"
-                if sql and start is not None and end is not None:
-                    formatted_sql = highlight_sql(sql, [(start, end)])[0]
-                    error_msg += f"\n  {formatted_sql}"
-
-                raise OptimizeError(error_msg)
-
-            if unqualified_columns and scope.pivots and scope.pivots[0].unpivot:
-                # New columns produced by the UNPIVOT can't be qualified, but there may be columns
-                # under the UNPIVOT's IN clause that can and should be qualified. We recompute
-                # this list here to ensure those in the former category will be excluded.
-                unpivot_columns = set(_unpivot_columns(scope.pivots[0]))
-                unqualified_columns = [c for c in unqualified_columns if c not in unpivot_columns]
-
-            all_unqualified_columns.extend(unqualified_columns)
-
-    if all_unqualified_columns:
-        first_column = all_unqualified_columns[0]
-        line = first_column.this.meta.get("line")
-        col = first_column.this.meta.get("col")
-        start = first_column.this.meta.get("start")
-        end = first_column.this.meta.get("end")
-
-        error_msg = f"Ambiguous column '{first_column.name}'"
-        if line and col:
-            error_msg += f" (Line: {line}, Col: {col})"
-        if sql and start is not None and end is not None:
-            formatted_sql = highlight_sql(sql, [(start, end)])[0]
-            error_msg += f"\n  {formatted_sql}"
-
-        raise OptimizeError(error_msg)
-
-    return expression
+    pass
 
 
 def _separate_pseudocolumns(scope: Scope, pseudocolumns: set[str]) -> None:

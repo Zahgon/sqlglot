@@ -78,96 +78,26 @@ def _date_add_sql(kind: str) -> t.Callable[[PostgresGenerator, DATE_ADD_OR_SUB],
 
 
 def _date_diff_sql(self: PostgresGenerator, expression: exp.DateDiff | exp.TsOrDsDiff) -> str:
-    unit = expression.text("unit").upper()
-    factor = DATE_DIFF_FACTOR.get(unit)
-
-    end = f"CAST({self.sql(expression, 'this')} AS TIMESTAMP)"
-    start = f"CAST({self.sql(expression, 'expression')} AS TIMESTAMP)"
-
-    if factor is not None:
-        return f"CAST(EXTRACT(epoch FROM {end} - {start}){factor} AS BIGINT)"
-
-    age = f"AGE({end}, {start})"
-
-    if unit == "WEEK":
-        unit = f"EXTRACT(days FROM ({end} - {start})) / 7"
-    elif unit == "MONTH":
-        unit = f"EXTRACT(year FROM {age}) * 12 + EXTRACT(month FROM {age})"
-    elif unit == "QUARTER":
-        unit = f"EXTRACT(year FROM {age}) * 4 + EXTRACT(month FROM {age}) / 3"
-    elif unit == "YEAR":
-        unit = f"EXTRACT(year FROM {age})"
-    else:
-        unit = age
-
-    return f"CAST({unit} AS BIGINT)"
+    pass
 
 
 def _substring_sql(self: PostgresGenerator, expression: exp.Substring) -> str:
-    this = self.sql(expression, "this")
-    start = self.sql(expression, "start")
-    length = self.sql(expression, "length")
-
-    from_part = f" FROM {start}" if start else ""
-    for_part = f" FOR {length}" if length else ""
-
-    return f"SUBSTRING({this}{from_part}{for_part})"
+    pass
 
 
 def _auto_increment_to_serial(expression: exp.Expr) -> exp.Expr:
-    auto = expression.find(exp.AutoIncrementColumnConstraint)
-
-    if auto:
-        expression.args["constraints"].remove(auto.parent)
-        kind = expression.args["kind"]
-
-        if kind.this == exp.DType.INT:
-            kind.replace(exp.DataType(this=exp.DType.SERIAL))
-        elif kind.this == exp.DType.SMALLINT:
-            kind.replace(exp.DataType(this=exp.DType.SMALLSERIAL))
-        elif kind.this == exp.DType.BIGINT:
-            kind.replace(exp.DataType(this=exp.DType.BIGSERIAL))
-
-    return expression
+    pass
 
 
 def _serial_to_generated(expression: exp.Expr) -> exp.Expr:
-    if not isinstance(expression, exp.ColumnDef):
-        return expression
-    kind = expression.kind
-    if not kind:
-        return expression
-
-    if kind.this == exp.DType.SERIAL:
-        data_type = exp.DataType(this=exp.DType.INT)
-    elif kind.this == exp.DType.SMALLSERIAL:
-        data_type = exp.DataType(this=exp.DType.SMALLINT)
-    elif kind.this == exp.DType.BIGSERIAL:
-        data_type = exp.DataType(this=exp.DType.BIGINT)
-    else:
-        data_type = None
-
-    if data_type:
-        expression.args["kind"].replace(data_type)
-        constraints = expression.args["constraints"]
-        generated = exp.ColumnConstraint(kind=exp.GeneratedAsIdentityColumnConstraint(this=False))
-        notnull = exp.ColumnConstraint(kind=exp.NotNullColumnConstraint())
-
-        if notnull not in constraints:
-            constraints.insert(0, notnull)
-        if generated not in constraints:
-            constraints.insert(0, generated)
-
-    return expression
+    pass
 
 
 def _json_extract_sql(
     name: str, op: str
 ) -> t.Callable[[PostgresGenerator, JSON_EXTRACT_TYPE], str]:
     def _generate(self: PostgresGenerator, expression: JSON_EXTRACT_TYPE) -> str:
-        if expression.args.get("only_json_types"):
-            return json_extract_segments(name, quoted_index=False, op=op)(self, expression)
-        return json_extract_segments(name)(self, expression)
+        pass
 
     return _generate
 
@@ -187,39 +117,17 @@ def _unix_to_time_sql(self: PostgresGenerator, expression: exp.UnixToTime) -> st
 
 
 def _levenshtein_sql(self: PostgresGenerator, expression: exp.Levenshtein) -> str:
-    name = "LEVENSHTEIN_LESS_EQUAL" if expression.args.get("max_dist") else "LEVENSHTEIN"
-
-    return rename_func(name)(self, expression)
+    pass
 
 
 def _versioned_anyvalue_sql(self: PostgresGenerator, expression: exp.AnyValue) -> str:
     # https://www.postgresql.org/docs/16/functions-aggregate.html
     # https://www.postgresql.org/about/featurematrix/
-    if self.dialect.version < (16,):
-        return any_value_to_max_sql(self, expression)
-
-    return rename_func("ANY_VALUE")(self, expression)
+    pass
 
 
 def _round_sql(self: PostgresGenerator, expression: exp.Round) -> str:
-    this = self.sql(expression, "this")
-    decimals = self.sql(expression, "decimals")
-
-    if not decimals:
-        return self.func("ROUND", this)
-
-    if not expression.type:
-        from sqlglot.optimizer.annotate_types import annotate_types
-
-        expression = annotate_types(expression, dialect=self.dialect)
-
-    # ROUND(double precision, integer) is not permitted in Postgres
-    # so it's necessary to cast to decimal before rounding.
-    if expression.this.is_type(exp.DType.DOUBLE):
-        decimal_type = exp.DType.DECIMAL.into_expr(expressions=expression.expressions)
-        this = self.sql(exp.Cast(this=this, to=decimal_type))
-
-    return self.func("ROUND", this, decimals)
+    pass
 
 
 class PostgresGenerator(generator.Generator):
@@ -399,62 +307,21 @@ class PostgresGenerator(generator.Generator):
     }
 
     def schemacommentproperty_sql(self, expression: exp.SchemaCommentProperty) -> str:
-        self.unsupported("Table comments are not supported in the CREATE statement")
-        return ""
+        pass
 
     def commentcolumnconstraint_sql(self, expression: exp.CommentColumnConstraint) -> str:
-        self.unsupported("Column comments are not supported in the CREATE statement")
-        return ""
+        pass
 
     def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
         # PostgreSQL places parameter modes BEFORE parameter name
-        param_constraint = expression.find(exp.InOutColumnConstraint)
-
-        if param_constraint:
-            mode_sql = self.sql(param_constraint)
-            param_constraint.pop()  # Remove to prevent double-rendering
-            base_sql = super().columndef_sql(expression, sep)
-            return f"{mode_sql} {base_sql}"
-
-        return super().columndef_sql(expression, sep)
+        pass
 
     def unnest_sql(self, expression: exp.Unnest) -> str:
-        if len(expression.expressions) == 1:
-            arg = expression.expressions[0]
-            if isinstance(arg, exp.GenerateDateArray):
-                generate_series: exp.Expr = exp.GenerateSeries(**arg.args)
-                if isinstance(expression.parent, (exp.From, exp.Join)):
-                    generate_series = (
-                        exp.select("value::date")
-                        .from_(exp.Table(this=generate_series).as_("_t", table=["value"]))
-                        .subquery(expression.args.get("alias") or "_unnested_generate_series")
-                    )
-                return self.sql(generate_series)
-
-            from sqlglot.optimizer.annotate_types import annotate_types
-
-            this = annotate_types(arg, dialect=self.dialect)
-            if this.is_type("array<json>"):
-                while isinstance(this, exp.Cast):
-                    this = this.this
-
-                arg_as_json = self.sql(exp.cast(this, exp.DType.JSON))
-                alias = self.sql(expression, "alias")
-                alias = f" AS {alias}" if alias else ""
-
-                if expression.args.get("offset"):
-                    self.unsupported("Unsupported JSON_ARRAY_ELEMENTS with offset")
-
-                return f"JSON_ARRAY_ELEMENTS({arg_as_json}){alias}"
-
-        return super().unnest_sql(expression)
+        pass
 
     def bracket_sql(self, expression: exp.Bracket) -> str:
         """Forms like ARRAY[1, 2, 3][3] aren't allowed; we need to wrap the ARRAY."""
-        if isinstance(expression.this, exp.Array):
-            expression.set("this", exp.paren(expression.this, copy=False))
-
-        return super().bracket_sql(expression)
+        pass
 
     def matchagainst_sql(self, expression: exp.MatchAgainst) -> str:
         this = self.sql(expression, "this")
@@ -463,29 +330,10 @@ class PostgresGenerator(generator.Generator):
         return f"({sql})" if len(expressions) > 1 else sql
 
     def alterset_sql(self, expression: exp.AlterSet) -> str:
-        exprs = self.expressions(expression, flat=True)
-        exprs = f"({exprs})" if exprs else ""
-
-        access_method = self.sql(expression, "access_method")
-        access_method = f"ACCESS METHOD {access_method}" if access_method else ""
-        tablespace = self.sql(expression, "tablespace")
-        tablespace = f"TABLESPACE {tablespace}" if tablespace else ""
-        option = self.sql(expression, "option")
-
-        return f"SET {exprs}{access_method}{tablespace}{option}"
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
-        if expression.is_type(exp.DType.ARRAY):
-            if expression.expressions:
-                values = self.expressions(expression, key="values", flat=True)
-                return f"{self.expressions(expression, flat=True)}[{values}]"
-            return "ARRAY"
-
-        if expression.is_type(exp.DType.DOUBLE, exp.DType.FLOAT) and expression.expressions:
-            # Postgres doesn't support precision for REAL and DOUBLE PRECISION types
-            return f"FLOAT({self.expressions(expression, flat=True)})"
-
-        return super().datatype_sql(expression)
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         this = expression.this
@@ -497,50 +345,31 @@ class PostgresGenerator(generator.Generator):
         return super().cast_sql(expression, safe_prefix=safe_prefix)
 
     def array_sql(self, expression: exp.Array) -> str:
-        exprs = expression.expressions
-        func_name = self.normalize_func("ARRAY")
-
-        if isinstance(seq_get(exprs, 0), exp.Select):
-            return f"{func_name}({self.sql(exprs[0])})"
-
-        return f"{func_name}{inline_array_sql(self, expression)}"
+        pass
 
     def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
-        return f"GENERATED ALWAYS AS ({self.sql(expression, 'this')}) STORED"
+        pass
 
     def isascii_sql(self, expression: exp.IsAscii) -> str:
-        return f"({self.sql(expression.this)} ~ '^[[:ascii:]]*$')"
+        pass
 
     def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
         # https://www.postgresql.org/docs/current/functions-window.html
-        self.unsupported("PostgreSQL does not support IGNORE NULLS.")
-        return self.sql(expression.this)
+        pass
 
     def respectnulls_sql(self, expression: exp.RespectNulls) -> str:
         # https://www.postgresql.org/docs/current/functions-window.html
-        self.unsupported("PostgreSQL does not support RESPECT NULLS.")
-        return self.sql(expression.this)
+        pass
 
     @unsupported_args("this")
     def currentschema_sql(self, expression: exp.CurrentSchema) -> str:
-        return "CURRENT_SCHEMA"
+        pass
 
     def interval_sql(self, expression: exp.Interval) -> str:
-        unit = expression.text("unit").lower()
-
-        this = expression.this
-        if unit.startswith("quarter") and isinstance(this, exp.Literal):
-            this.replace(exp.Literal.string(int(this.to_py()) * 3))
-            expression.args["unit"].replace(exp.var("MONTH"))
-
-        return super().interval_sql(expression)
+        pass
 
     def placeholder_sql(self, expression: exp.Placeholder) -> str:
-        if expression.args.get("jdbc"):
-            return "?"
-
-        this = f"({expression.name})" if expression.this else ""
-        return f"{self.NAMED_PLACEHOLDER_TOKEN}{this}s"
+        pass
 
     def arraycontains_sql(self, expression: exp.ArrayContains) -> str:
         # Convert DuckDB's LIST_CONTAINS(array, value) to PostgreSQL
@@ -552,18 +381,4 @@ class PostgresGenerator(generator.Generator):
         #
         # PostgreSQL equivalent: CASE WHEN value IS NULL THEN NULL
         #                            ELSE COALESCE(value = ANY(array), FALSE) END
-        value = expression.expression
-        array = expression.this
-
-        coalesce_expr = exp.Coalesce(
-            this=value.eq(exp.Any(this=exp.paren(expression=array, copy=False))),
-            expressions=[exp.false()],
-        )
-
-        case_expr = (
-            exp.Case()
-            .when(exp.Is(this=value, expression=exp.null()), exp.null(), copy=False)
-            .else_(coalesce_expr, copy=False)
-        )
-
-        return self.sql(case_expr)
+        pass

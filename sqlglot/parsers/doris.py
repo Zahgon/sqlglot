@@ -9,18 +9,7 @@ from sqlglot.tokens import TokenType
 
 # Accept both DATE_TRUNC(datetime, unit) and DATE_TRUNC(unit, datetime)
 def _build_date_trunc(args: list[exp.Expr]) -> exp.Expr:
-    a0, a1 = seq_get(args, 0), seq_get(args, 1)
-
-    def _is_unit_like(e: exp.Expr | None) -> bool:
-        if not (isinstance(e, exp.Literal) and e.is_string):
-            return False
-        text = e.this
-        return not any(ch.isdigit() for ch in text)
-
-    # Determine which argument is the unit
-    unit, this = (a0, a1) if _is_unit_like(a0) else (a1, a0)
-
-    return exp.TimestampTrunc(this=this, unit=unit)
+    pass
 
 
 class DorisParser(MySQLParser):
@@ -79,36 +68,10 @@ class DorisParser(MySQLParser):
         )
 
     def _parse_partitioning_granularity_dynamic(self) -> exp.PartitionByRangePropertyDynamic:
-        self._match_text_seq("FROM")
-        start = self._parse_wrapped(self._parse_string)
-        self._match_text_seq("TO")
-        end = self._parse_wrapped(self._parse_string)
-        self._match_text_seq("INTERVAL")
-        number = self._parse_number()
-        unit = self._parse_var(any_token=True)
-        every = self.expression(exp.Interval(this=number, unit=unit))
-        return self.expression(
-            exp.PartitionByRangePropertyDynamic(start=start, end=end, every=every)
-        )
+        pass
 
     def _parse_partition_range_value(self) -> exp.Expr | None:
-        expr = super()._parse_partition_range_value()
-
-        if isinstance(expr, exp.Partition):
-            return expr
-
-        self._match_text_seq("VALUES")
-        name = expr
-
-        # Doris-specific bracket syntax: VALUES [(...), (...))
-        self._match(TokenType.L_BRACKET)
-        values = self._parse_csv(lambda: self._parse_wrapped_csv(self._parse_expression))
-
-        self._match(TokenType.R_BRACKET)
-        self._match(TokenType.R_PAREN)
-
-        part_range = self.expression(exp.PartitionRange(this=name, expressions=values))
-        return self.expression(exp.Partition(expressions=[part_range]))
+        pass
 
     def _parse_build_property(self) -> exp.BuildProperty:
         return self.expression(exp.BuildProperty(this=self._parse_var(upper=True)))

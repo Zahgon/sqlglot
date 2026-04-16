@@ -72,77 +72,24 @@ HIVE_TS_OR_DS_EXPRESSIONS: tuple[type[exp.Expr], ...] = (
 
 
 def _add_date_sql(self: HiveGenerator, expression: DATE_ADD_OR_SUB) -> str:
-    if isinstance(expression, exp.TsOrDsAdd) and not expression.unit:
-        return self.func("DATE_ADD", expression.this, expression.expression)
-
-    unit = expression.text("unit").upper()
-    func, multiplier = DATE_DELTA_INTERVAL.get(unit, ("DATE_ADD", 1))
-
-    if isinstance(expression, exp.DateSub):
-        multiplier *= -1
-
-    increment = expression.expression
-    if isinstance(increment, exp.Literal):
-        value = increment.to_py() if increment.is_number else int(increment.name)
-        increment = exp.Literal.number(value * multiplier)
-    elif multiplier != 1:
-        increment *= exp.Literal.number(multiplier)
-
-    return self.func(func, expression.this, increment)
+    pass
 
 
 def _date_diff_sql(self: HiveGenerator, expression: exp.DateDiff | exp.TsOrDsDiff) -> str:
-    unit = expression.text("unit").upper()
-
-    factor = TIME_DIFF_FACTOR.get(unit)
-    if factor is not None:
-        left = self.sql(expression, "this")
-        right = self.sql(expression, "expression")
-        sec_diff = f"UNIX_TIMESTAMP({left}) - UNIX_TIMESTAMP({right})"
-        return f"({sec_diff}){factor}" if factor else sec_diff
-
-    months_between = unit in DIFF_MONTH_SWITCH
-    sql_func = "MONTHS_BETWEEN" if months_between else "DATEDIFF"
-    _, multiplier = DATE_DELTA_INTERVAL.get(unit, ("", 1))
-    multiplier_sql = f" / {multiplier}" if multiplier > 1 else ""
-    diff_sql = f"{sql_func}({self.format_args(expression.this, expression.expression)})"
-
-    if months_between or multiplier_sql:
-        # MONTHS_BETWEEN returns a float, so we need to truncate the fractional part.
-        # For the same reason, we want to truncate if there's a divisor present.
-        diff_sql = f"CAST({diff_sql}{multiplier_sql} AS INT)"
-
-    return diff_sql
+    pass
 
 
 def _json_format_sql(self: HiveGenerator, expression: exp.JSONFormat) -> str:
-    this = expression.this
-
-    if is_parse_json(this):
-        if this.this.is_string:
-            # Since FROM_JSON requires a nested type, we always wrap the json string with
-            # an array to ensure that "naked" strings like "'a'" will be handled correctly
-            wrapped_json = exp.Literal.string(f"[{this.this.name}]")
-
-            from_json = self.func(
-                "FROM_JSON", wrapped_json, self.func("SCHEMA_OF_JSON", wrapped_json)
-            )
-            to_json = self.func("TO_JSON", from_json)
-
-            # This strips the [, ] delimiters of the dummy array printed by TO_JSON
-            return self.func("REGEXP_EXTRACT", to_json, "'^.(.*).$'", "1")
-        return self.sql(this)
-
-    return self.func("TO_JSON", this, expression.args.get("options"))
+    pass
 
 
 @generator.unsupported_args(("expression", "Hive's SORT_ARRAY does not support a comparator."))
 def _array_sort_sql(self: HiveGenerator, expression: exp.ArraySort) -> str:
-    return self.func("SORT_ARRAY", expression.this)
+    pass
 
 
 def _str_to_unix_sql(self: HiveGenerator, expression: exp.StrToUnix) -> str:
-    return self.func("UNIX_TIMESTAMP", expression.this, time_format("hive")(self, expression))
+    pass
 
 
 def _unix_to_time_sql(self: HiveGenerator, expression: exp.UnixToTime) -> str:
@@ -155,11 +102,7 @@ def _unix_to_time_sql(self: HiveGenerator, expression: exp.UnixToTime) -> str:
 
 
 def _str_to_date_sql(self: HiveGenerator, expression: exp.StrToDate) -> str:
-    this = self.sql(expression, "this")
-    time_format = self.format_time(expression)
-    if time_format not in (HIVE_TIME_FORMAT, HIVE_DATE_FORMAT):
-        this = f"FROM_UNIXTIME(UNIX_TIMESTAMP({this}, {time_format}))"
-    return f"CAST({this} AS DATE)"
+    pass
 
 
 def _str_to_time_sql(self: HiveGenerator, expression: exp.StrToTime) -> str:
@@ -171,14 +114,7 @@ def _str_to_time_sql(self: HiveGenerator, expression: exp.StrToTime) -> str:
 
 
 def _to_date_sql(self: HiveGenerator, expression: exp.TsOrDsToDate) -> str:
-    time_format = self.format_time(expression)
-    if time_format and time_format not in (HIVE_TIME_FORMAT, HIVE_DATE_FORMAT):
-        return self.func("TO_DATE", expression.this, time_format)
-
-    if isinstance(expression.parent, self.TS_OR_DS_EXPRESSIONS):
-        return self.sql(expression, "this")
-
-    return self.func("TO_DATE", expression.this)
+    pass
 
 
 class HiveGenerator(generator.Generator):
@@ -367,14 +303,10 @@ class HiveGenerator(generator.Generator):
     IGNORE_NULLS_FUNCS = (exp.First, exp.Last, exp.FirstValue, exp.LastValue)
 
     def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
-        this = expression.this
-        if isinstance(this, self.IGNORE_NULLS_FUNCS):
-            return self.func(this.sql_name(), this.this, exp.true())
-
-        return super().ignorenulls_sql(expression)
+        pass
 
     def unnest_sql(self, expression: exp.Unnest) -> str:
-        return rename_func("EXPLODE")(self, expression)
+        pass
 
     def _jsonpathkey_sql(self, expression: exp.JSONPathKey) -> str:
         if isinstance(expression.this, exp.JSONPathWildcard):
@@ -384,160 +316,59 @@ class HiveGenerator(generator.Generator):
         return super()._jsonpathkey_sql(expression)
 
     def parameter_sql(self, expression: exp.Parameter) -> str:
-        this = self.sql(expression, "this")
-        expression_sql = self.sql(expression, "expression")
-
-        parent = expression.parent
-        this = f"{this}:{expression_sql}" if expression_sql else this
-
-        if isinstance(parent, exp.EQ) and isinstance(parent.parent, exp.SetItem):
-            # We need to produce SET key = value instead of SET ${key} = value
-            return this
-
-        return f"${{{this}}}"
+        pass
 
     def schema_sql(self, expression: exp.Schema) -> str:
-        for ordered in expression.find_all(exp.Ordered):
-            if ordered.args.get("desc") is False:
-                ordered.set("desc", None)
-
-        return super().schema_sql(expression)
+        pass
 
     def constraint_sql(self, expression: exp.Constraint) -> str:
-        for prop in list(expression.find_all(exp.Properties)):
-            prop.pop()
-
-        this = self.sql(expression, "this")
-        expressions = self.expressions(expression, sep=" ", flat=True)
-        return f"CONSTRAINT {this} {expressions}"
+        pass
 
     def rowformatserdeproperty_sql(self, expression: exp.RowFormatSerdeProperty) -> str:
-        serde_props = self.sql(expression, "serde_properties")
-        serde_props = f" {serde_props}" if serde_props else ""
-        return f"ROW FORMAT SERDE {self.sql(expression, 'this')}{serde_props}"
+        pass
 
     def arrayagg_sql(self, expression: exp.ArrayAgg) -> str:
-        return self.func(
-            "COLLECT_LIST",
-            expression.this.this if isinstance(expression.this, exp.Order) else expression.this,
-        )
+        pass
 
     # Hive/Spark lack native numeric TRUNC. CAST to BIGINT truncates toward zero (not rounds).
     # Potential enhancement: a TRUNC_TEMPLATE using FLOOR/CEIL with scale (Spark 3.3+)
     # could preserve decimals: CASE WHEN x >= 0 THEN FLOOR(x, d) ELSE CEIL(x, d) END
     @unsupported_args("decimals")
     def trunc_sql(self, expression: exp.Trunc) -> str:
-        return self.sql(exp.cast(expression.this, exp.DType.BIGINT))
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
-        if expression.this in self.PARAMETERIZABLE_TEXT_TYPES and (
-            not expression.expressions or expression.expressions[0].name == "MAX"
-        ):
-            expression = exp.DType.TEXT.into_expr()
-        elif expression.is_type(exp.DType.TEXT) and expression.expressions:
-            expression.set("this", exp.DType.VARCHAR)
-        elif expression.this in exp.DataType.TEMPORAL_TYPES:
-            expression = exp.DataType.build(expression.this)
-        elif expression.is_type("float"):
-            size_expression = expression.find(exp.DataTypeParam)
-            if size_expression:
-                size = int(size_expression.name)
-                builder = exp.DType.FLOAT if size <= 32 else exp.DType.DOUBLE
-                expression = builder.into_expr()
-        return super().datatype_sql(expression)
+        pass
 
     def version_sql(self, expression: exp.Version) -> str:
-        sql = super().version_sql(expression)
-        return sql.replace("FOR ", "", 1)
+        pass
 
     def struct_sql(self, expression: exp.Struct) -> str:
-        values = []
-
-        for i, e in enumerate(expression.expressions):
-            if isinstance(e, exp.PropertyEQ):
-                self.unsupported("Hive does not support named structs.")
-                values.append(e.expression)
-            else:
-                values.append(e)
-
-        return self.func("STRUCT", *values)
+        pass
 
     def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
-        return super().columndef_sql(
-            expression,
-            sep=(
-                ": "
-                if isinstance(expression.parent, exp.DataType)
-                and expression.parent.is_type("struct")
-                else sep
-            ),
-        )
+        pass
 
     def altercolumn_sql(self, expression: exp.AlterColumn) -> str:
-        this = self.sql(expression, "this")
-        new_name = self.sql(expression, "rename_to") or this
-        dtype = self.sql(expression, "dtype")
-        comment = (
-            f" COMMENT {self.sql(expression, 'comment')}" if self.sql(expression, "comment") else ""
-        )
-        default = self.sql(expression, "default")
-        visible = expression.args.get("visible")
-        allow_null = expression.args.get("allow_null")
-        drop = expression.args.get("drop")
-
-        if any([default, drop, visible, allow_null, drop]):
-            self.unsupported("Unsupported CHANGE COLUMN syntax")
-
-        if not dtype:
-            self.unsupported("CHANGE COLUMN without a type is not supported")
-
-        return f"CHANGE COLUMN {this} {new_name} {dtype}{comment}"
+        pass
 
     def renamecolumn_sql(self, expression: exp.RenameColumn) -> str:
-        self.unsupported("Cannot rename columns without data type defined in Hive")
-        return ""
+        pass
 
     def alterset_sql(self, expression: exp.AlterSet) -> str:
-        exprs = self.expressions(expression, flat=True)
-        exprs = f" {exprs}" if exprs else ""
-        location = self.sql(expression, "location")
-        location = f" LOCATION {location}" if location else ""
-        file_format = self.expressions(expression, key="file_format", flat=True, sep=" ")
-        file_format = f" FILEFORMAT {file_format}" if file_format else ""
-        serde = self.sql(expression, "serde")
-        serde = f" SERDE {serde}" if serde else ""
-        tags = self.expressions(expression, key="tag", flat=True, sep="")
-        tags = f" TAGS {tags}" if tags else ""
-
-        return f"SET{serde}{exprs}{location}{file_format}{tags}"
+        pass
 
     def serdeproperties_sql(self, expression: exp.SerdeProperties) -> str:
-        prefix = "WITH " if expression.args.get("with_") else ""
-        exprs = self.expressions(expression, flat=True)
-
-        return f"{prefix}SERDEPROPERTIES ({exprs})"
+        pass
 
     def exists_sql(self, expression: exp.Exists) -> str:
-        if expression.expression:
-            return self.function_fallback_sql(expression)
-
-        return super().exists_sql(expression)
+        pass
 
     def timetostr_sql(self, expression: exp.TimeToStr) -> str:
-        this = expression.this
-        if isinstance(this, exp.TimeStrToTime):
-            this = this.this
-
-        return self.func("DATE_FORMAT", this, self.format_time(expression))
+        pass
 
     def usingproperty_sql(self, expression: exp.UsingProperty) -> str:
-        kind = expression.args.get("kind")
-        return f"USING {kind} {self.sql(expression, 'this')}"
+        pass
 
     def fileformatproperty_sql(self, expression: exp.FileFormatProperty) -> str:
-        if isinstance(expression.this, exp.InputOutputFormat):
-            this = self.sql(expression, "this")
-        else:
-            this = expression.name.upper()
-
-        return f"STORED AS {this}"
+        pass

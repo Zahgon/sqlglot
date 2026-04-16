@@ -37,48 +37,15 @@ DQUOTES_ESCAPING_JSON_FUNCTIONS = ("JSON_QUERY", "JSON_VALUE", "JSON_QUERY_ARRAY
 
 
 def _derived_table_values_to_unnest(self: BigQueryGenerator, expression: exp.Values) -> str:
-    if not expression.find_ancestor(exp.From, exp.Join):
-        return self.values_sql(expression)
-
-    structs = []
-    alias = expression.args.get("alias")
-    for tup in expression.find_all(exp.Tuple):
-        field_aliases = (
-            alias.columns
-            if alias and alias.columns
-            else (f"_c{i}" for i in range(len(tup.expressions)))
-        )
-        expressions = [
-            exp.PropertyEQ(this=exp.to_identifier(name), expression=fld)
-            for name, fld in zip(field_aliases, tup.expressions)
-        ]
-        structs.append(exp.Struct(expressions=expressions))
-
-    # Due to `UNNEST_COLUMN_ONLY`, it is expected that the table alias be contained in the columns expression
-    alias_name_only = exp.TableAlias(columns=[alias.this]) if alias else None
-    return self.unnest_sql(
-        exp.Unnest(expressions=[exp.array(*structs, copy=False)], alias=alias_name_only)
-    )
+    pass
 
 
 def _returnsproperty_sql(self: BigQueryGenerator, expression: exp.ReturnsProperty) -> str:
-    this = expression.this
-    if isinstance(this, exp.Schema):
-        this = f"{self.sql(this, 'this')} <{self.expressions(this)}>"
-    else:
-        this = self.sql(this)
-    return f"RETURNS {this}"
+    pass
 
 
 def _create_sql(self: BigQueryGenerator, expression: exp.Create) -> str:
-    returns = expression.find(exp.ReturnsProperty)
-    if expression.kind == "FUNCTION" and returns and returns.args.get("is_table"):
-        expression.set("kind", "TABLE FUNCTION")
-
-        if isinstance(expression.expression, (exp.Subquery, exp.Literal)):
-            expression.set("expression", expression.expression.this)
-
-    return self.create_sql(expression)
+    pass
 
 
 # https://issuetracker.google.com/issues/162294746
@@ -89,73 +56,24 @@ def _create_sql(self: BigQueryGenerator, expression: exp.Create) -> str:
 # GROUP BY x + 1
 # ORDER by z
 def _alias_ordered_group(expression: exp.Expr) -> exp.Expr:
-    if isinstance(expression, exp.Select):
-        group = expression.args.get("group")
-        order = expression.args.get("order")
-
-        if group and order:
-            aliases = {
-                select.this: select.args["alias"]
-                for select in expression.selects
-                if isinstance(select, exp.Alias)
-            }
-
-            for grouped in group.expressions:
-                if grouped.is_int:
-                    continue
-                alias = aliases.get(grouped)
-                if alias:
-                    grouped.replace(exp.column(alias))
-
-    return expression
+    pass
 
 
 def _pushdown_cte_column_names(expression: exp.Expr) -> exp.Expr:
     """BigQuery doesn't allow column names when defining a CTE, so we try to push them down."""
-    if isinstance(expression, exp.CTE) and expression.alias_column_names:
-        cte_query = expression.this
-
-        if cte_query.is_star:
-            logger.warning(
-                "Can't push down CTE column names for star queries. Run the query through"
-                " the optimizer or use 'qualify' to expand the star projections first."
-            )
-            return expression
-
-        column_names = expression.alias_column_names
-        expression.args["alias"].set("columns", None)
-
-        for name, select in zip(column_names, cte_query.selects):
-            to_replace = select
-
-            if isinstance(select, exp.Alias):
-                select = select.this
-
-            # Inner aliases are shadowed by the CTE column names
-            to_replace.replace(exp.alias_(select, name))
-
-    return expression
+    pass
 
 
 def _array_contains_sql(self: BigQueryGenerator, expression: exp.ArrayContains) -> str:
-    return self.sql(
-        exp.Exists(
-            this=exp.select("1")
-            .from_(exp.Unnest(expressions=[expression.left]).as_("_unnest", table=["_col"]))
-            .where(exp.column("_col").eq(expression.right))
-        )
-    )
+    pass
 
 
 def _ts_or_ds_add_sql(self: BigQueryGenerator, expression: exp.TsOrDsAdd) -> str:
-    return date_add_interval_sql("DATE", "ADD")(self, ts_or_ds_add_cast(expression))
+    pass
 
 
 def _ts_or_ds_diff_sql(self: BigQueryGenerator, expression: exp.TsOrDsDiff) -> str:
-    expression.this.replace(exp.cast(expression.this, exp.DType.TIMESTAMP))
-    expression.expression.replace(exp.cast(expression.expression, exp.DType.TIMESTAMP))
-    unit = unit_to_var(expression)
-    return self.func("DATE_DIFF", expression.this, expression.expression, unit)
+    pass
 
 
 def _unix_to_time_sql(self: BigQueryGenerator, expression: exp.UnixToTime) -> str:
@@ -176,28 +94,12 @@ def _unix_to_time_sql(self: BigQueryGenerator, expression: exp.UnixToTime) -> st
 
 
 def _str_to_datetime_sql(self: BigQueryGenerator, expression: exp.StrToDate | exp.StrToTime) -> str:
-    this = self.sql(expression, "this")
-    dtype = "DATE" if isinstance(expression, exp.StrToDate) else "TIMESTAMP"
-
-    if expression.args.get("safe"):
-        fmt = self.format_time(
-            expression,
-            self.dialect.INVERSE_FORMAT_MAPPING,
-            self.dialect.INVERSE_FORMAT_TRIE,
-        )
-        return f"SAFE_CAST({this} AS {dtype} FORMAT {fmt})"
-
-    fmt = self.format_time(expression)
-    return self.func(f"PARSE_{dtype}", fmt, this, expression.args.get("zone"))
+    pass
 
 
 @unsupported_args("ins_cost", "del_cost", "sub_cost")
 def _levenshtein_sql(self: BigQueryGenerator, expression: exp.Levenshtein) -> str:
-    max_dist = expression.args.get("max_dist")
-    if max_dist:
-        max_dist = exp.Kwarg(this=exp.var("max_distance"), expression=max_dist)
-
-    return self.func("EDIT_DISTANCE", expression.this, expression.expression, max_dist)
+    pass
 
 
 def _json_extract_sql(self: BigQueryGenerator, expression: JSON_EXTRACT_TYPE) -> str:
@@ -550,28 +452,13 @@ class BigQueryGenerator(generator.Generator):
     }
 
     def datetrunc_sql(self, expression: exp.DateTrunc) -> str:
-        unit = expression.unit
-        unit_sql = unit.name if unit.is_string else self.sql(unit)
-        return self.func("DATE_TRUNC", expression.this, unit_sql, expression.args.get("zone"))
+        pass
 
     def mod_sql(self, expression: exp.Mod) -> str:
-        this = expression.this
-        expr = expression.expression
-        return self.func(
-            "MOD",
-            this.unnest() if isinstance(this, exp.Paren) else this,
-            expr.unnest() if isinstance(expr, exp.Paren) else expr,
-        )
+        pass
 
     def column_parts(self, expression: exp.Column) -> str:
-        if expression.meta.get("quoted_column"):
-            # If a column reference is of the form `dataset.table`.name, we need
-            # to preserve the quoted table path, otherwise the reference breaks
-            table_parts = ".".join(p.name for p in expression.parts[:-1])
-            table_path = self.sql(exp.Identifier(this=table_parts, quoted=True))
-            return f"{table_path}.{self.sql(expression, 'this')}"
-
-        return super().column_parts(expression)
+        pass
 
     def table_parts(self, expression: exp.Table) -> str:
         # Depending on the context, `x.y` may not resolve to the same data source as `x`.`y`, so
@@ -589,91 +476,29 @@ class BigQueryGenerator(generator.Generator):
         return super().table_parts(expression)
 
     def timetostr_sql(self, expression: exp.TimeToStr) -> str:
-        this = expression.this
-        if isinstance(this, exp.TsOrDsToDatetime):
-            func_name = "FORMAT_DATETIME"
-        elif isinstance(this, exp.TsOrDsToTimestamp):
-            func_name = "FORMAT_TIMESTAMP"
-        elif isinstance(this, exp.TsOrDsToTime):
-            func_name = "FORMAT_TIME"
-        else:
-            func_name = "FORMAT_DATE"
-
-        time_expr = this if isinstance(this, self.TS_OR_DS_TYPES) else expression
-        return self.func(
-            func_name, self.format_time(expression), time_expr.this, expression.args.get("zone")
-        )
+        pass
 
     def eq_sql(self, expression: exp.EQ) -> str:
         # Operands of = cannot be NULL in BigQuery
-        if isinstance(expression.left, exp.Null) or isinstance(expression.right, exp.Null):
-            if not isinstance(expression.parent, exp.Update):
-                return "NULL"
-
-        return self.binary(expression, "=")
+        pass
 
     def attimezone_sql(self, expression: exp.AtTimeZone) -> str:
-        parent = expression.parent
-
-        # BigQuery allows CAST(.. AS {STRING|TIMESTAMP} [FORMAT <fmt> [AT TIME ZONE <tz>]]).
-        # Only the TIMESTAMP one should use the below conversion, when AT TIME ZONE is included.
-        if not isinstance(parent, exp.Cast) or not parent.to.is_type("text"):
-            return self.func(
-                "TIMESTAMP", self.func("DATETIME", expression.this, expression.args.get("zone"))
-            )
-
-        return super().attimezone_sql(expression)
+        pass
 
     def trycast_sql(self, expression: exp.TryCast) -> str:
         return self.cast_sql(expression, safe_prefix="SAFE_")
 
     def bracket_sql(self, expression: exp.Bracket) -> str:
-        this = expression.this
-        expressions = expression.expressions
-
-        if len(expressions) == 1 and this and this.is_type(exp.DType.STRUCT):
-            arg = expressions[0]
-            if arg.type is None:
-                from sqlglot.optimizer.annotate_types import annotate_types
-
-                arg = annotate_types(arg, dialect=self.dialect)
-
-            if arg.type and arg.type.this in exp.DataType.TEXT_TYPES:
-                # BQ doesn't support bracket syntax with string values for structs
-                return f"{self.sql(this)}.{arg.name}"
-
-        expressions_sql = self.expressions(expression, flat=True)
-        offset = expression.args.get("offset")
-
-        if offset == 0:
-            expressions_sql = f"OFFSET({expressions_sql})"
-        elif offset == 1:
-            expressions_sql = f"ORDINAL({expressions_sql})"
-        elif offset is not None:
-            self.unsupported(f"Unsupported array offset: {offset}")
-
-        if expression.args.get("safe"):
-            expressions_sql = f"SAFE_{expressions_sql}"
-
-        return f"{self.sql(this)}[{expressions_sql}]"
+        pass
 
     def in_unnest_op(self, expression: exp.Unnest) -> str:
-        return self.sql(expression)
+        pass
 
     def version_sql(self, expression: exp.Version) -> str:
-        if expression.name == "TIMESTAMP":
-            expression.set("this", "SYSTEM_TIME")
-        return super().version_sql(expression)
+        pass
 
     def contains_sql(self, expression: exp.Contains) -> str:
-        this = expression.this
-        expr = expression.expression
-
-        if isinstance(this, exp.Lower) and isinstance(expr, exp.Lower):
-            this = this.this
-            expr = expr.this
-
-        return self.func("CONTAINS_SUBSTR", this, expr, expression.args.get("json_scope"))
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         this = expression.this

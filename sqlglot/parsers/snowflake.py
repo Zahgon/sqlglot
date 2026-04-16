@@ -32,11 +32,7 @@ def _build_approx_top_k(args: list) -> exp.ApproxTopK:
     - k defaults to 1 if omitted (per Snowflake documentation)
     - counters is optional precision parameter
     """
-    # Add default k=1 if only column is provided
-    if len(args) == 1:
-        args.append(exp.Literal.number(1))
-
-    return exp.ApproxTopK.from_arg_list(args)
+    pass
 
 
 def _build_to_number(args: list, safe: bool = False) -> exp.ToNumber:
@@ -60,12 +56,7 @@ def _build_to_number(args: list, safe: bool = False) -> exp.ToNumber:
 
 
 def _build_date_from_parts(args: list) -> exp.DateFromParts:
-    return exp.DateFromParts(
-        year=seq_get(args, 0),
-        month=seq_get(args, 1),
-        day=seq_get(args, 2),
-        allow_overflow=True,
-    )
+    pass
 
 
 # Timestamp types used in _build_datetime
@@ -79,166 +70,57 @@ TIMESTAMP_TYPES = {
 
 def _build_datetime(name: str, kind: exp.DType, safe: bool = False) -> t.Callable[[list], exp.Func]:
     def _builder(args: list) -> exp.Func:
-        value = seq_get(args, 0)
-        scale_or_fmt = seq_get(args, 1)
-
-        int_value = value is not None and is_int(value.name)
-        int_scale_or_fmt = scale_or_fmt is not None and scale_or_fmt.is_int
-
-        if isinstance(value, (exp.Literal, exp.Neg)) or (value and scale_or_fmt):
-            # Converts calls like `TO_TIME('01:02:03')` into casts
-            if len(args) == 1 and value.is_string and not int_value:
-                return (
-                    exp.TryCast(this=value, to=kind.into_expr(), requires_string=True)
-                    if safe
-                    else exp.cast(value, kind)
-                )
-
-            # Handles `TO_TIMESTAMP(str, fmt)` and `TO_TIMESTAMP(num, scale)` as special
-            # cases so we can transpile them, since they're relatively common
-            if kind in TIMESTAMP_TYPES:
-                if not safe and (int_scale_or_fmt or (int_value and scale_or_fmt is None)):
-                    # TRY_TO_TIMESTAMP('integer') is not parsed into exp.UnixToTime as
-                    # it's not easily transpilable. Also, numeric-looking strings with
-                    # format strings (e.g., TO_TIMESTAMP('20240115', 'YYYYMMDD')) should
-                    # use StrToTime, not UnixToTime.
-                    unix_expr = exp.UnixToTime(this=value, scale=scale_or_fmt)
-                    unix_expr.set("target_type", exp.DataType.build(kind, dialect="snowflake"))
-                    return unix_expr
-                if scale_or_fmt and not int_scale_or_fmt:
-                    # Format string provided (e.g., 'YYYY-MM-DD'), use StrToTime
-                    strtotime_expr = build_formatted_time(exp.StrToTime, "snowflake")(args)
-                    strtotime_expr.set("safe", safe)
-                    strtotime_expr.set("target_type", exp.DataType.build(kind, dialect="snowflake"))
-                    return strtotime_expr
-
-        # Handle DATE/TIME with format strings - allow int_value if a format string is provided
-        has_format_string = scale_or_fmt and not int_scale_or_fmt
-        if kind in (exp.DType.DATE, exp.DType.TIME) and (not int_value or has_format_string):
-            klass = exp.TsOrDsToDate if kind == exp.DType.DATE else exp.TsOrDsToTime
-            formatted_exp = build_formatted_time(klass, "snowflake")(args)
-            formatted_exp.set("safe", safe)
-            return formatted_exp
-
-        return exp.Anonymous(this=name, expressions=args)
+        pass
 
     return _builder
 
 
 def _build_bitwise(expr_type: type[B], name: str) -> t.Callable[[list], B | exp.Anonymous]:
     def _builder(args: list) -> B | exp.Anonymous:
-        if len(args) == 3:
-            # Special handling for bitwise operations with padside argument
-            if expr_type in (exp.BitwiseAnd, exp.BitwiseOr, exp.BitwiseXor):
-                return expr_type(
-                    this=seq_get(args, 0), expression=seq_get(args, 1), padside=seq_get(args, 2)
-                )
-            return exp.Anonymous(this=name, expressions=args)
-
-        result = binary_from_function(expr_type)(args)
-
-        # Snowflake specifies INT128 for bitwise shifts
-        if expr_type in (exp.BitwiseLeftShift, exp.BitwiseRightShift):
-            result.set("requires_int128", True)
-
-        return result
+        pass
 
     return _builder
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/div0
 def _build_if_from_div0(args: list) -> exp.If:
-    lhs = exp._wrap(seq_get(args, 0), exp.Binary)
-    rhs = exp._wrap(seq_get(args, 1), exp.Binary)
-
-    cond = exp.EQ(this=rhs, expression=exp.Literal.number(0)).and_(
-        exp.Is(this=lhs, expression=exp.null()).not_()
-    )
-    true = exp.Literal.number(0)
-    false = exp.Div(this=lhs, expression=rhs)
-    return exp.If(this=cond, true=true, false=false)
+    pass
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/div0null
 def _build_if_from_div0null(args: list) -> exp.If:
-    lhs = exp._wrap(seq_get(args, 0), exp.Binary)
-    rhs = exp._wrap(seq_get(args, 1), exp.Binary)
-
-    # Returns 0 when divisor is 0 OR NULL
-    cond = exp.EQ(this=rhs, expression=exp.Literal.number(0)).or_(
-        exp.Is(this=rhs, expression=exp.null())
-    )
-    true = exp.Literal.number(0)
-    false = exp.Div(this=lhs, expression=rhs)
-    return exp.If(this=cond, true=true, false=false)
+    pass
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/zeroifnull
 def _build_if_from_zeroifnull(args: list) -> exp.If:
-    cond = exp.Is(this=seq_get(args, 0), expression=exp.Null())
-    return exp.If(this=cond, true=exp.Literal.number(0), false=seq_get(args, 0))
+    pass
 
 
 def _build_search(args: list) -> exp.Search:
-    kwargs = {
-        "this": seq_get(args, 0),
-        "expression": seq_get(args, 1),
-        **{arg.name.lower(): arg for arg in args[2:] if isinstance(arg, exp.Kwarg)},
-    }
-    return exp.Search(**kwargs)
+    pass
 
 
 # https://docs.snowflake.com/en/sql-reference/functions/zeroifnull
 def _build_if_from_nullifzero(args: list) -> exp.If:
-    cond = exp.EQ(this=seq_get(args, 0), expression=exp.Literal.number(0))
-    return exp.If(this=cond, true=exp.Null(), false=seq_get(args, 0))
+    pass
 
 
 def _build_regexp_replace(args: list) -> exp.RegexpReplace:
-    regexp_replace = exp.RegexpReplace.from_arg_list(args)
-
-    if not regexp_replace.args.get("replacement"):
-        regexp_replace.set("replacement", exp.Literal.string(""))
-
-    return regexp_replace
+    pass
 
 
 def _build_regexp_like(args: list) -> exp.RegexpLike:
-    return exp.RegexpLike(
-        this=seq_get(args, 0),
-        expression=seq_get(args, 1),
-        flag=seq_get(args, 2),
-        full_match=True,
-    )
+    pass
 
 
 def _date_trunc_to_time(args: list) -> exp.DateTrunc | exp.TimestampTrunc:
-    trunc = date_trunc_to_time(args)
-    unit = map_date_part(trunc.args["unit"])
-    trunc.set("unit", unit)
-    is_time_input = trunc.this.is_type(exp.DType.TIME, exp.DType.TIMETZ)
-    if (isinstance(trunc, exp.TimestampTrunc) and is_date_unit(unit) or is_time_input) or (
-        isinstance(trunc, exp.DateTrunc) and not is_date_unit(unit)
-    ):
-        trunc.set("input_type_preserved", True)
-    return trunc
+    pass
 
 
 def _build_regexp_extract(expr_type: type[E]) -> t.Callable[[list, Dialect], E]:
     def _builder(args: list, dialect: Dialect) -> E:
-        return expr_type(
-            this=seq_get(args, 0),
-            expression=seq_get(args, 1),
-            position=seq_get(args, 2),
-            occurrence=seq_get(args, 3),
-            parameters=seq_get(args, 4),
-            group=seq_get(args, 5) or exp.Literal.number(0),
-            **(
-                {"null_if_pos_overflow": dialect.REGEXP_EXTRACT_POSITION_OVERFLOW_RETURNS_NULL}
-                if expr_type is exp.RegexpExtract
-                else {}
-            ),
-        )
+        pass
 
     return _builder
 
@@ -248,10 +130,7 @@ def _build_timestamp_from_parts(args: list) -> exp.Func:
     1. TIMESTAMP_FROM_PARTS(year, month, day, hour, minute, second [, nanosecond] [, time_zone])
     2. TIMESTAMP_FROM_PARTS(date_expr, time_expr) - Snowflake specific
     """
-    if len(args) == 2:
-        return exp.TimestampFromParts(this=seq_get(args, 0), expression=seq_get(args, 1))
-
-    return exp.TimestampFromParts.from_arg_list(args)
+    pass
 
 
 def _build_round(args: list) -> exp.Round:
@@ -263,33 +142,11 @@ def _build_round(args: list) -> exp.Round:
     Note: Snowflake does not support mixing named and positional arguments.
     Arguments are either all named or all positional.
     """
-    kwarg_map = {"EXPR": "this", "SCALE": "decimals", "ROUNDING_MODE": "truncate"}
-    round_args = {}
-    positional_keys = ["this", "decimals", "truncate"]
-    positional_idx = 0
-
-    for arg in args:
-        if isinstance(arg, exp.Kwarg):
-            key = arg.this.name.upper()
-            round_key = kwarg_map.get(key)
-            if round_key:
-                round_args[round_key] = arg.expression
-        else:
-            if positional_idx < len(positional_keys):
-                round_args[positional_keys[positional_idx]] = arg
-                positional_idx += 1
-
-    expression = exp.Round(**round_args)
-    expression.set("casts_non_integer_decimals", True)
-    return expression
+    pass
 
 
 def _build_array_sort(args: list) -> exp.SortArray:
-    asc = seq_get(args, 1)
-    nulls_first = seq_get(args, 2)
-    if nulls_first is None and isinstance(asc, exp.Boolean):
-        nulls_first = exp.Boolean(this=not asc.this)
-    return exp.SortArray(this=seq_get(args, 0), asc=asc, nulls_first=nulls_first)
+    pass
 
 
 def _build_generator(args: list) -> exp.Generator:
@@ -298,21 +155,7 @@ def _build_generator(args: list) -> exp.Generator:
 
     Maps ROWCOUNT => rowcount, TIMELIMIT => timelimit.
     """
-    kwarg_map = {"ROWCOUNT": "rowcount", "TIMELIMIT": "timelimit"}
-    gen_args = {}
-
-    positional_keys = ("rowcount", "timelimit")
-
-    for i, arg in enumerate(args):
-        if isinstance(arg, exp.Kwarg):
-            key = arg.this.name.upper()
-            gen_key = kwarg_map.get(key)
-            if gen_key:
-                gen_args[gen_key] = arg.expression
-        elif i < len(positional_keys):
-            gen_args[positional_keys[i]] = arg
-
-    return exp.Generator(**gen_args)
+    pass
 
 
 def _show_parser(*args: t.Any, **kwargs: t.Any) -> t.Callable[[SnowflakeParser], exp.Show]:
@@ -1208,11 +1051,7 @@ class SnowflakeParser(parser.Parser):
 
     def _parse_file_location(self) -> exp.Expr | None:
         # Parse either a subquery or a staged file
-        return (
-            self._parse_select(table=True, parse_subquery_alias=False)
-            if self._match(TokenType.L_PAREN, advance=False)
-            else self._parse_table_parts()
-        )
+        pass
 
     def _parse_location_path(self) -> exp.Var:
         start = self._curr

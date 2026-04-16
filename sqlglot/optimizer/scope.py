@@ -153,55 +153,10 @@ class Scope:
         )
 
     def _collect(self) -> None:
-        self._tables = []
-        self._ctes = []
-        self._subqueries = []
-        self._derived_tables = []
-        self._udtfs = []
-        self._raw_columns = []
-        self._table_columns = []
-        self._stars = []
-        self._join_hints = []
-        self._semi_anti_join_tables = set()
-        self._column_index = set()
-
-        for node in self.walk():
-            if node is self.expression:
-                continue
-
-            if isinstance(node, exp.Dot) and node.is_star:
-                self._stars.append(node)
-            elif type(node) is exp.Column:
-                self._column_index.add(id(node))
-
-                if isinstance(node.this, exp.Star):
-                    self._stars.append(node)
-                else:
-                    self._raw_columns.append(node)
-            elif isinstance(node, exp.Table) and not isinstance(node.parent, exp.JoinHint):
-                parent = node.parent
-                if isinstance(parent, exp.Join) and parent.is_semi_or_anti_join:
-                    self._semi_anti_join_tables.add(node.alias_or_name)
-
-                self._tables.append(node)
-            elif isinstance(node, exp.JoinHint):
-                self._join_hints.append(node)
-            elif isinstance(node, exp.UDTF):
-                self._udtfs.append(node)
-            elif isinstance(node, exp.CTE):
-                self._ctes.append(node)
-            elif _is_derived_table(node) and _is_from_or_join(node):
-                self._derived_tables.append(t.cast(exp.Subquery, node))
-            elif isinstance(node, exp.UNWRAPPED_QUERIES) and not _is_from_or_join(node):
-                self._subqueries.append(node)
-            elif isinstance(node, exp.TableColumn):
-                self._table_columns.append(node)
-
-        self._collected = True
+        pass
 
     def _ensure_collected(self) -> None:
-        if not self._collected:
-            self._collect()
+        pass
 
     def walk(self, prune: t.Callable[[exp.Expr], bool] | None = None) -> Iterator[exp.Expr]:
         return walk_in_scope(self.expression, prune=prune)
@@ -233,8 +188,7 @@ class Scope:
         Returns:
             list[exp.Table]: tables
         """
-        self._ensure_collected()
-        return self._tables
+        pass
 
     @property
     def ctes(self) -> list[exp.CTE]:
@@ -244,8 +198,7 @@ class Scope:
         Returns:
             list[exp.CTE]: ctes
         """
-        self._ensure_collected()
-        return self._ctes
+        pass
 
     @property
     def derived_tables(self) -> list[exp.Subquery]:
@@ -258,8 +211,7 @@ class Scope:
         Returns:
             list[exp.Subquery]: derived tables
         """
-        self._ensure_collected()
-        return self._derived_tables
+        pass
 
     @property
     def udtfs(self) -> list[exp.UDTF]:
@@ -269,8 +221,7 @@ class Scope:
         Returns:
             list[exp.UDTF]: UDTFs
         """
-        self._ensure_collected()
-        return self._udtfs
+        pass
 
     @property
     def subqueries(self) -> list[exp.Select | exp.SetOperation]:
@@ -283,24 +234,21 @@ class Scope:
         Returns:
             list[exp.Select | exp.SetOperation]: subqueries
         """
-        self._ensure_collected()
-        return self._subqueries
+        pass
 
     @property
     def stars(self) -> list[exp.Column | exp.Dot]:
         """
         List of star expressions (columns or dots) in this scope.
         """
-        self._ensure_collected()
-        return self._stars
+        pass
 
     @property
     def column_index(self) -> set[int]:
         """
         Set of column object IDs that belong to this scope's expression.
         """
-        self._ensure_collected()
-        return self._column_index
+        pass
 
     @property
     def columns(self) -> list[exp.Column]:
@@ -311,58 +259,11 @@ class Scope:
             list[exp.Column]: Column instances in this scope, plus any
                 Columns that reference this scope from correlated subqueries.
         """
-        if self._columns is None:
-            self._ensure_collected()
-            columns = self._raw_columns
-
-            external_columns = [
-                column
-                for scope in itertools.chain(
-                    self.subquery_scopes,
-                    self.udtf_scopes,
-                    (dts for dts in self.derived_table_scopes if dts.can_be_correlated),
-                )
-                for column in scope.external_columns
-            ]
-
-            expr = self.expression
-            named_selects = set(expr.named_selects) if isinstance(expr, exp.Query) else set()
-
-            self._columns = []
-            for column in columns + external_columns:
-                ancestor = column.find_ancestor(
-                    exp.Select,
-                    exp.Qualify,
-                    exp.Order,
-                    exp.Having,
-                    exp.Hint,
-                    exp.Table,
-                    exp.Star,
-                    exp.Distinct,
-                )
-                if (
-                    not ancestor
-                    or column.text("table")
-                    or isinstance(ancestor, exp.Select)
-                    or (isinstance(ancestor, exp.Table) and not isinstance(ancestor.this, exp.Func))
-                    or (
-                        isinstance(ancestor, (exp.Order, exp.Distinct))
-                        and (
-                            isinstance(ancestor.parent, (exp.Window, exp.WithinGroup))
-                            or not isinstance(ancestor.parent, exp.Select)
-                            or column.name not in named_selects
-                        )
-                    )
-                    or (isinstance(ancestor, exp.Star) and not column.arg_key == "except_")
-                ):
-                    self._columns.append(column)
-
-        return self._columns
+        pass
 
     @property
     def table_columns(self) -> list[exp.TableColumn]:
-        self._ensure_collected()
-        return self._table_columns
+        pass
 
     @property
     def selected_sources(self) -> dict[str, tuple[exp.Selectable, exp.Table | Scope]]:
@@ -375,43 +276,11 @@ class Scope:
         Returns:
             dict[str, (exp.Table|exp.Select, exp.Table|Scope)]: selected sources and nodes
         """
-        if self._selected_sources is None:
-            result: dict[str, tuple[exp.Selectable, exp.Table | Scope]] = {}
-
-            for name, node in self.references:
-                if name in self._semi_anti_join_tables:
-                    # The RHS table of SEMI/ANTI joins shouldn't be collected as a
-                    # selected source
-                    continue
-
-                if name in result:
-                    raise OptimizeError(f"Alias already used: {name}")
-                if name in self.sources:
-                    result[name] = (node, self.sources[name])
-
-            self._selected_sources = result
-        return self._selected_sources
+        pass
 
     @property
     def references(self) -> list[tuple[str, exp.Selectable]]:
-        if self._references is None:
-            self._references = []
-
-            for table in self.tables:
-                self._references.append((table.alias_or_name, table))
-            for _expr in itertools.chain(self.derived_tables, self.udtfs):
-                # TODO (mypyc): rebind to exp.Expr to avoid DerivedTable trait vtable dispatch
-                expression: exp.Expr = _expr
-                self._references.append(
-                    (
-                        _get_source_alias(expression),
-                        (
-                            expression if expression.args.get("pivots") else expression.unnest()
-                        ).assert_is(exp.Selectable),
-                    )
-                )
-
-        return self._references
+        pass
 
     @property
     def external_columns(self) -> list[exp.Column]:
@@ -421,20 +290,7 @@ class Scope:
         Returns:
             list[exp.Column]: Column instances that don't reference sources in the current scope.
         """
-        if self._external_columns is None:
-            if isinstance(self.expression, exp.SetOperation):
-                left, right = self.union_scopes
-                self._external_columns = left.external_columns + right.external_columns
-            else:
-                local_source_names = {name for name, _ in self.references}
-                self._external_columns = [
-                    c
-                    for c in self.columns
-                    if c.text("table") not in local_source_names
-                    and c.text("table") not in self.semi_or_anti_join_tables
-                ]
-
-        return self._external_columns
+        pass
 
     @property
     def local_columns(self) -> list[exp.Column]:
@@ -444,11 +300,7 @@ class Scope:
         Returns:
             list[exp.Column]: Column instances that reference sources in the current scope.
         """
-        if self._local_columns is None:
-            external_columns = set(self.external_columns)
-            self._local_columns = [c for c in self.columns if c not in external_columns]
-
-        return self._local_columns
+        pass
 
     @property
     def unqualified_columns(self) -> list[exp.Column]:
@@ -458,7 +310,7 @@ class Scope:
         Returns:
              list[exp.Column]: Unqualified columns
         """
-        return [c for c in self.columns if not c.text("table")]
+        pass
 
     @property
     def join_hints(self) -> list[exp.JoinHint]:
@@ -468,22 +320,15 @@ class Scope:
         Returns:
             list[exp.JoinHint]: Join hints that are referenced within the scope
         """
-        self._ensure_collected()
-        return self._join_hints
+        pass
 
     @property
     def pivots(self) -> list[exp.Pivot]:
-        if self._pivots is None:
-            self._pivots = [
-                pivot for _, node in self.references for pivot in node.args.get("pivots") or []
-            ]
-
-        return self._pivots
+        pass
 
     @property
     def semi_or_anti_join_tables(self) -> set[str]:
-        self._ensure_collected()
-        return self._semi_anti_join_tables
+        pass
 
     def source_columns(self, source_name: str) -> list[exp.Column]:
         """
@@ -499,37 +344,37 @@ class Scope:
     @property
     def is_subquery(self) -> bool:
         """Determine if this scope is a subquery"""
-        return self.scope_type == ScopeType.SUBQUERY
+        pass
 
     @property
     def is_derived_table(self) -> bool:
         """Determine if this scope is a derived table"""
-        return self.scope_type == ScopeType.DERIVED_TABLE
+        pass
 
     @property
     def is_union(self) -> bool:
         """Determine if this scope is a union"""
-        return self.scope_type == ScopeType.UNION
+        pass
 
     @property
     def is_cte(self) -> bool:
         """Determine if this scope is a common table expression"""
-        return self.scope_type == ScopeType.CTE
+        pass
 
     @property
     def is_root(self) -> bool:
         """Determine if this is the root scope"""
-        return self.scope_type == ScopeType.ROOT
+        pass
 
     @property
     def is_udtf(self) -> bool:
         """Determine if this scope is a UDTF (User Defined Table Function)"""
-        return self.scope_type == ScopeType.UDTF
+        pass
 
     @property
     def is_correlated_subquery(self) -> bool:
         """Determine if this scope is a correlated subquery"""
-        return bool(self.can_be_correlated and self.external_columns)
+        pass
 
     def rename_source(self, old_name: str | None, new_name: str) -> None:
         """Rename a source in this scope"""
@@ -773,13 +618,7 @@ def _is_from_or_join(expression: exp.Expr) -> bool:
     """
     Determine if `expression` is the FROM or JOIN clause of a SELECT statement.
     """
-    parent = expression.parent
-
-    # Subqueries can be arbitrarily nested
-    while type(parent) is exp.Subquery:
-        parent = parent.parent
-
-    return type(parent) in (exp.From, exp.Join)
+    pass
 
 
 def _traverse_tables(scope: Scope) -> Iterator[Scope]:

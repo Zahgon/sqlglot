@@ -271,21 +271,7 @@ class RedshiftGenerator(PostgresGenerator):
     }
 
     def unnest_sql(self, expression: exp.Unnest) -> str:
-        args = expression.expressions
-        num_args = len(args)
-
-        if num_args != 1:
-            self.unsupported(f"Unsupported number of arguments in UNNEST: {num_args}")
-            return ""
-
-        if isinstance(expression.find_ancestor(exp.From, exp.Join, exp.Select), exp.Select):
-            self.unsupported("Unsupported UNNEST when not used in FROM/JOIN clauses")
-            return ""
-
-        arg = self.sql(seq_get(args, 0))
-
-        alias = self.expressions(expression.args.get("alias"), key="columns", flat=True)
-        return f"{arg} AS {alias}" if alias else arg
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         if expression.is_type(exp.DType.JSON):
@@ -301,36 +287,19 @@ class RedshiftGenerator(PostgresGenerator):
         without precision we convert it to `VARCHAR(max)` and if it does have precision then we just convert
         `TEXT` to `VARCHAR`.
         """
-        if expression.is_type("text"):
-            expression.set("this", exp.DType.VARCHAR)
-            precision = expression.args.get("expressions")
-
-            if not precision:
-                expression.append("expressions", exp.var("MAX"))
-
-        return super().datatype_sql(expression)
+        pass
 
     def alterset_sql(self, expression: exp.AlterSet) -> str:
-        exprs = self.expressions(expression, flat=True)
-        exprs = f" TABLE PROPERTIES ({exprs})" if exprs else ""
-        location = self.sql(expression, "location")
-        location = f" LOCATION {location}" if location else ""
-        file_format = self.expressions(expression, key="file_format", flat=True, sep=" ")
-        file_format = f" FILE FORMAT {file_format}" if file_format else ""
-
-        return f"SET{exprs}{location}{file_format}"
+        pass
 
     def array_sql(self, expression: exp.Array) -> str:
-        if expression.args.get("bracket_notation"):
-            return super().array_sql(expression)
-
-        return rename_func("ARRAY")(self, expression)
+        pass
 
     def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
-        return Generator.ignorenulls_sql(self, expression)
+        pass
 
     def respectnulls_sql(self, expression: exp.RespectNulls) -> str:
-        return Generator.respectnulls_sql(self, expression)
+        pass
 
     def explode_sql(self, expression: exp.Explode) -> str:
         self.unsupported("Unsupported EXPLODE() function")

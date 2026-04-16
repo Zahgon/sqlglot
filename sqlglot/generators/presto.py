@@ -36,50 +36,19 @@ DATE_ADD_OR_SUB = t.Union[exp.DateAdd, exp.TimestampAdd, exp.DateSub]
 
 
 def _initcap_sql(self: PrestoGenerator, expression: exp.Initcap) -> str:
-    delimiters = expression.expression
-    if delimiters and not (
-        delimiters.is_string and delimiters.this == self.dialect.INITCAP_DEFAULT_DELIMITER_CHARS
-    ):
-        self.unsupported("INITCAP does not support custom delimiters")
-
-    regex = r"(\w)(\w*)"
-    return f"REGEXP_REPLACE({self.sql(expression, 'this')}, '{regex}', x -> UPPER(x[1]) || LOWER(x[2]))"
+    pass
 
 
 def _no_sort_array(self: PrestoGenerator, expression: exp.SortArray) -> str:
-    if expression.args.get("asc") == exp.false():
-        comparator = "(a, b) -> CASE WHEN a < b THEN 1 WHEN a > b THEN -1 ELSE 0 END"
-    else:
-        comparator = None
-    return self.func("ARRAY_SORT", expression.this, comparator)
+    pass
 
 
 def _schema_sql(self: PrestoGenerator, expression: exp.Schema) -> str:
-    if isinstance(expression.parent, exp.PartitionedByProperty):
-        # Any columns in the ARRAY[] string literals should not be quoted
-        expression.transform(lambda n: n.name if isinstance(n, exp.Identifier) else n, copy=False)
-
-        partition_exprs = [
-            self.sql(c) if isinstance(c, (exp.Func, exp.Property)) else self.sql(c, "this")
-            for c in expression.expressions
-        ]
-        return self.sql(exp.Array(expressions=[exp.Literal.string(c) for c in partition_exprs]))
-
-    if expression.parent:
-        for schema in expression.parent.find_all(exp.Schema):
-            if schema is expression:
-                continue
-
-            column_defs = schema.find_all(exp.ColumnDef)
-            if column_defs and isinstance(schema.parent, exp.Property):
-                expression.expressions.extend(column_defs)
-
-    return self.schema_sql(expression)
+    pass
 
 
 def _quantile_sql(self: PrestoGenerator, expression: exp.Quantile) -> str:
-    self.unsupported("Presto does not support exact quantiles")
-    return self.func("APPROX_PERCENTILE", expression.this, expression.args.get("quantile"))
+    pass
 
 
 def _str_to_time_sql(
@@ -89,24 +58,15 @@ def _str_to_time_sql(
 
 
 def _ts_or_ds_to_date_sql(self: PrestoGenerator, expression: exp.TsOrDsToDate) -> str:
-    time_format = self.format_time(expression)
-    dialect_class = type(self.dialect)
-    if time_format and time_format not in (dialect_class.TIME_FORMAT, dialect_class.DATE_FORMAT):
-        return self.sql(exp.cast(_str_to_time_sql(self, expression), exp.DType.DATE))
-    return self.sql(exp.cast(exp.cast(expression.this, exp.DType.TIMESTAMP), exp.DType.DATE))
+    pass
 
 
 def _ts_or_ds_add_sql(self: PrestoGenerator, expression: exp.TsOrDsAdd) -> str:
-    expression = ts_or_ds_add_cast(expression)
-    unit = unit_to_str(expression)
-    return self.func("DATE_ADD", unit, expression.expression, expression.this)
+    pass
 
 
 def _ts_or_ds_diff_sql(self: PrestoGenerator, expression: exp.TsOrDsDiff) -> str:
-    this = exp.cast(expression.this, exp.DType.TIMESTAMP)
-    expr = exp.cast(expression.expression, exp.DType.TIMESTAMP)
-    unit = unit_to_str(expression)
-    return self.func("DATE_DIFF", unit, expr, this)
+    pass
 
 
 def _first_last_sql(self: PrestoGenerator, expression: exp.Func) -> str:
@@ -117,10 +77,7 @@ def _first_last_sql(self: PrestoGenerator, expression: exp.Func) -> str:
 
     Reference: https://trino.io/docs/current/sql/match-recognize.html#logical-navigation-functions
     """
-    if isinstance(expression.find_ancestor(exp.MatchRecognize, exp.Select), exp.MatchRecognize):
-        return self.function_fallback_sql(expression)
-
-    return rename_func("ARBITRARY")(self, expression)
+    pass
 
 
 def _unix_to_time_sql(self: PrestoGenerator, expression: exp.UnixToTime) -> str:
@@ -146,37 +103,13 @@ def _date_delta_sql(
     name: str, negate_interval: bool = False
 ) -> t.Callable[[PrestoGenerator, DATE_ADD_OR_SUB], str]:
     def _delta_sql(self: PrestoGenerator, expression: DATE_ADD_OR_SUB) -> str:
-        interval = _to_int(self, expression.expression)
-        return self.func(
-            name,
-            unit_to_str(expression),
-            interval * (-1) if negate_interval else interval,
-            expression.this,
-        )
+        pass
 
     return _delta_sql
 
 
 def _explode_to_unnest_sql(self: PrestoGenerator, expression: exp.Lateral) -> str:
-    explode = expression.this
-    if isinstance(explode, exp.Explode):
-        exploded_type = explode.this.type
-        alias = expression.args.get("alias")
-
-        # This attempts a best-effort transpilation of LATERAL VIEW EXPLODE on a struct array
-        if (
-            isinstance(alias, exp.TableAlias)
-            and isinstance(exploded_type, exp.DataType)
-            and exploded_type.is_type(exp.DType.ARRAY)
-            and exploded_type.expressions
-            and exploded_type.expressions[0].is_type(exp.DType.STRUCT)
-        ):
-            # When unnesting a ROW in Presto, it produces N columns, so we need to fix the alias
-            alias.set("columns", [c.this.copy() for c in exploded_type.expressions[0].expressions])
-    elif isinstance(explode, exp.Inline):
-        explode.replace(exp.Explode(this=explode.this.copy()))
-
-    return explode_to_unnest_sql(self, expression)
+    pass
 
 
 def amend_exploded_column_table(expression: exp.Expr) -> exp.Expr:
@@ -453,56 +386,13 @@ class PrestoGenerator(generator.Generator):
     }
 
     def extract_sql(self, expression: exp.Extract) -> str:
-        date_part = expression.name
-
-        if not date_part.startswith("EPOCH"):
-            return super().extract_sql(expression)
-
-        if date_part == "EPOCH_MILLISECOND":
-            scale = 10**3
-        elif date_part == "EPOCH_MICROSECOND":
-            scale = 10**6
-        elif date_part == "EPOCH_NANOSECOND":
-            scale = 10**9
-        else:
-            scale = None
-
-        value = expression.expression
-
-        ts = exp.cast(value, to=exp.DType.TIMESTAMP.into_expr())
-        to_unix: exp.Expr = exp.TimeToUnix(this=ts)
-
-        if scale:
-            to_unix = exp.Mul(this=to_unix, expression=exp.Literal.number(scale))
-
-        return self.sql(to_unix)
+        pass
 
     def jsonformat_sql(self, expression: exp.JSONFormat) -> str:
-        this = expression.this
-        is_json = expression.args.get("is_json")
-
-        if this and not (is_json or this.type):
-            from sqlglot.optimizer.annotate_types import annotate_types
-
-            this = annotate_types(this, dialect=self.dialect)
-
-        if not (is_json or this.is_type(exp.DType.JSON)):
-            this.replace(exp.cast(this, exp.DType.JSON))
-
-        return self.function_fallback_sql(expression)
+        pass
 
     def md5_sql(self, expression: exp.MD5) -> str:
-        this = expression.this
-
-        if not this.type:
-            from sqlglot.optimizer.annotate_types import annotate_types
-
-            this = annotate_types(this, dialect=self.dialect)
-
-        if this.is_type(*exp.DataType.TEXT_TYPES):
-            this = exp.Encode(this=this, charset=exp.Literal.string("utf-8"))
-
-        return self.func("LOWER", self.func("TO_HEX", self.func("MD5", self.sql(this))))
+        pass
 
     def strtounix_sql(self, expression: exp.StrToUnix) -> str:
         # Since `TO_UNIXTIME` requires a `TIMESTAMP`, we need to parse the argument into one.
@@ -510,65 +400,19 @@ class PrestoGenerator(generator.Generator):
         # timezone involved, we wrap it in a `TRY` call and use `PARSE_DATETIME` as a fallback,
         # which seems to be using the same time mapping as Hive, as per:
         # https://joda-time.sourceforge.net/apidocs/org/joda/time/format/DateTimeFormat.html
-        this = expression.this
-        value_as_text = exp.cast(this, exp.DType.TEXT)
-        value_as_timestamp = exp.cast(this, exp.DType.TIMESTAMP) if this.is_string else this
-
-        parse_without_tz = self.func("DATE_PARSE", value_as_text, self.format_time(expression))
-
-        formatted_value = self.func("DATE_FORMAT", value_as_timestamp, self.format_time(expression))
-        parse_with_tz = self.func(
-            "PARSE_DATETIME",
-            formatted_value,
-            self.format_time(expression, Hive.INVERSE_TIME_MAPPING, Hive.INVERSE_TIME_TRIE),
-        )
-        coalesced = self.func("COALESCE", self.func("TRY", parse_without_tz), parse_with_tz)
-        return self.func("TO_UNIXTIME", coalesced)
+        pass
 
     def bracket_sql(self, expression: exp.Bracket) -> str:
-        if expression.args.get("safe"):
-            return bracket_to_element_at_sql(self, expression)
-        return super().bracket_sql(expression)
+        pass
 
     def struct_sql(self, expression: exp.Struct) -> str:
-        if not expression.type:
-            from sqlglot.optimizer.annotate_types import annotate_types
-
-            annotate_types(expression, dialect=self.dialect)
-
-        values: list[str] = []
-        schema: list[str] = []
-        unknown_type = False
-
-        for e in expression.expressions:
-            if isinstance(e, exp.PropertyEQ):
-                if e.type and e.type.is_type(exp.DType.UNKNOWN):
-                    unknown_type = True
-                else:
-                    schema.append(f"{self.sql(e, 'this')} {self.sql(e.type)}")
-                values.append(self.sql(e, "expression"))
-            else:
-                values.append(self.sql(e))
-
-        size = len(expression.expressions)
-
-        if not size or len(schema) != size:
-            if unknown_type:
-                self.unsupported(
-                    "Cannot convert untyped key-value definitions (try annotate_types)."
-                )
-            return self.func("ROW", *values)
-        return f"CAST(ROW({', '.join(values)}) AS ROW({', '.join(schema)}))"
+        pass
 
     def interval_sql(self, expression: exp.Interval) -> str:
-        if expression.this and expression.text("unit").upper().startswith("WEEK"):
-            return f"({expression.this.name} * INTERVAL '7' DAY)"
-        return super().interval_sql(expression)
+        pass
 
     def transaction_sql(self, expression: exp.Transaction) -> str:
-        modes = expression.args.get("modes")
-        modes = f" {', '.join(modes)}" if modes else ""
-        return f"START TRANSACTION{modes}"
+        pass
 
     def offset_limit_modifiers(
         self, expression: exp.Expr, fetch: bool, limit: exp.Fetch | exp.Limit | None
@@ -583,11 +427,7 @@ class PrestoGenerator(generator.Generator):
         Presto doesn't support CREATE VIEW with expressions (ex: `CREATE VIEW x (cola)` then `(cola)` is the expression),
         so we need to remove them
         """
-        kind = expression.args["kind"]
-        schema = expression.this
-        if kind == "VIEW" and schema.expressions:
-            expression.this.set("expressions", None)
-        return super().create_sql(expression)
+        pass
 
     def delete_sql(self, expression: exp.Delete) -> str:
         """
@@ -595,49 +435,10 @@ class PrestoGenerator(generator.Generator):
         to remove the unnecessary parts. If the original DELETE statement contains more
         than one table to be deleted, we can't safely map it 1-1 to a Presto statement.
         """
-        tables = expression.args.get("tables") or [expression.this]
-        if len(tables) > 1:
-            return super().delete_sql(expression)
-
-        table = tables[0]
-        expression.set("this", table)
-        expression.set("tables", None)
-
-        if isinstance(table, exp.Table):
-            table_alias = table.args.get("alias")
-            if table_alias:
-                table_alias.pop()
-                expression = t.cast(exp.Delete, expression.transform(unqualify_columns))
-
-        return super().delete_sql(expression)
+        pass
 
     def jsonextract_sql(self, expression: exp.JSONExtract) -> str:
-        is_json_extract = self.dialect.settings.get("variant_extract_is_json_extract", True)
-
-        # Generate JSON_EXTRACT unless the user has configured that a Snowflake / Databricks
-        # VARIANT extract (e.g. col:x.y) should map to dot notation (i.e ROW access) in Presto/Trino
-        if not expression.args.get("variant_extract") or is_json_extract:
-            return self.func(
-                "JSON_EXTRACT", expression.this, expression.expression, *expression.expressions
-            )
-
-        this = self.sql(expression, "this")
-
-        # Convert the JSONPath extraction `JSON_EXTRACT(col, '$.x.y) to a ROW access col.x.y
-        segments = []
-        for path_key in expression.expression.expressions[1:]:
-            if not isinstance(path_key, exp.JSONPathKey):
-                # Cannot transpile subscripts, wildcards etc to dot notation
-                self.unsupported(f"Cannot transpile JSONPath segment '{path_key}' to ROW access")
-                continue
-            key = path_key.this
-            if not exp.SAFE_IDENTIFIER_RE.match(key):
-                key = f'"{key}"'
-            segments.append(f".{key}")
-
-        expr = "".join(segments)
-
-        return f"{this}{expr}"
+        pass
 
     def groupconcat_sql(self, expression: exp.GroupConcat) -> str:
         return self.func(

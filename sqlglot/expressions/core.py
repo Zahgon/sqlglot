@@ -302,9 +302,7 @@ class Expr:
         """
         Dump this Expr to a JSON-serializable dict.
         """
-        from sqlglot.serde import dump
-
-        return dump(self)
+        pass
 
     @classmethod
     def load(cls, obj: list[dict[str, Any]] | None) -> Expr:
@@ -505,7 +503,7 @@ class Expr:
         Returns:
             The result of applying `func` to `Self` with the given arguments.
         """
-        return func(self, *args, **kwargs)
+        pass
 
     def apply(
         self, func: t.Callable[Concatenate[Self, P], t.Any], *args: P.args, **kwargs: P.kwargs
@@ -525,8 +523,7 @@ class Expr:
         Returns:
             The same instance.
         """
-        func(self, *args, **kwargs)
-        return self
+        pass
 
 
 class Expression(Expr):
@@ -600,7 +597,7 @@ class Expression(Expr):
         """
         Retrieves the argument with key "this".
         """
-        return self.args.get("this")
+        pass
 
     @property
     def expression(self) -> t.Any:
@@ -635,16 +632,14 @@ class Expression(Expr):
         """
         Checks whether a Literal expression is a string.
         """
-        return isinstance(self, Literal) and self.args["is_string"]
+        pass
 
     @property
     def is_number(self) -> bool:
         """
         Checks whether a Literal expression is a number.
         """
-        return (isinstance(self, Literal) and not self.args["is_string"]) or (
-            isinstance(self, Neg) and self.this.is_number
-        )
+        pass
 
     def to_py(self) -> t.Any:
         """
@@ -662,7 +657,7 @@ class Expression(Expr):
     @property
     def is_star(self) -> bool:
         """Checks whether an expression is a star."""
-        return isinstance(self, Star) or (isinstance(self, Column) and isinstance(self.this, Star))
+        pass
 
     @property
     def alias(self) -> str:
@@ -676,18 +671,15 @@ class Expression(Expr):
 
     @property
     def alias_column_names(self) -> list[str]:
-        table_alias = self.args.get("alias")
-        if not table_alias:
-            return []
-        return [c.name for c in table_alias.args.get("columns") or []]
+        pass
 
     @property
     def name(self) -> str:
-        return self.text("this")
+        pass
 
     @property
     def alias_or_name(self) -> str:
-        return self.alias or self.name
+        pass
 
     @property
     def output_name(self) -> str:
@@ -705,21 +697,15 @@ class Expression(Expr):
             >>> parse_one("SELECT 1 + 2").expressions[0].output_name
             ''
         """
-        return ""
+        pass
 
     @property
     def type(self) -> DataType | None:
-        if self.is_cast:
-            return self._type or self.to  # type: ignore[attr-defined]
-        return self._type
+        pass
 
     @type.setter
     def type(self, dtype: DataType | DType | str | None) -> None:
-        if dtype and type(dtype).__name__ != "DataType":
-            from sqlglot.expressions.datatypes import DataType as _DataType
-
-            dtype = _DataType.build(dtype)
-        self._type = dtype  # type: ignore[assignment]
+        pass
 
     def is_type(self, *dtypes: DATA_TYPE) -> bool:
         t = self._type
@@ -730,9 +716,7 @@ class Expression(Expr):
 
     @property
     def meta(self) -> dict[str, t.Any]:
-        if self._meta is None:
-            self._meta = {}
-        return self._meta
+        pass
 
     def __deepcopy__(self, memo: t.Any) -> Expr:
         root = self.__class__()
@@ -830,39 +814,7 @@ class Expression(Expr):
             overwrite: assuming an index is given, this determines whether to overwrite the
                 list entry instead of only inserting a new value (i.e., like list.insert).
         """
-        node: Expr | None = self
-
-        while node and node._hash is not None:
-            node._hash = None
-            node = node.parent
-
-        if index is not None:
-            expressions = self.args.get(arg_key) or []
-
-            if seq_get(expressions, index) is None:
-                return
-
-            if value is None:
-                expressions.pop(index)
-                for v in expressions[index:]:
-                    v.index = v.index - 1
-                return
-
-            if isinstance(value, list):
-                expressions.pop(index)
-                expressions[index:index] = value
-            elif overwrite:
-                expressions[index] = value
-            else:
-                expressions.insert(index, value)
-
-            value = expressions
-        elif value is None:
-            self.args.pop(arg_key, None)
-            return
-
-        self.args[arg_key] = value
-        self._set_parent(arg_key, value, index)
+        pass
 
     def _set_parent(self, arg_key: str, value: object, index: int | None = None) -> None:
         if isinstance(value, Expr):
@@ -894,9 +846,7 @@ class Expression(Expr):
         """
         Returns the depth of this tree.
         """
-        if self.parent:
-            return self.parent.depth + 1
-        return 0
+        pass
 
     def iter_expressions(self: E, reverse: bool = False) -> Iterator[E]:
         """Yields the key and expression for all arguments, exploding list args."""
@@ -958,23 +908,18 @@ class Expression(Expr):
         """
         Returns the parent select statement.
         """
-        from sqlglot.expressions.query import Select as _Select
-
-        return self.find_ancestor(_Select)
+        pass
 
     @property
     def same_parent(self) -> bool:
         """Returns if the parent is the same class as itself."""
-        return type(self.parent) is self.__class__
+        pass
 
     def root(self) -> Expr:
         """
         Returns the root expression of this tree.
         """
-        expression: Expr = self
-        while expression.parent:
-            expression = expression.parent
-        return expression
+        pass
 
     def walk(
         self, bfs: bool = True, prune: t.Callable[[Expr], bool] | None = None
@@ -1077,7 +1022,7 @@ class Expression(Expr):
         Same as __repr__, but includes additional information which can be useful
         for debugging, like empty or missing args and the AST nodes' object IDs.
         """
-        return _to_s(self, verbose=True)
+        pass
 
     def sql(
         self, dialect: DialectType = None, copy: bool = True, **opts: Unpack[GeneratorNoDialectArgs]
@@ -1402,50 +1347,21 @@ class Expression(Expr):
         copy: bool = True,
         **opts: Unpack[ParserNoDialectArgs],
     ) -> In:
-        from sqlglot.expressions.query import Query
-
-        subquery: Expr | None = None
-        if query:
-            subquery = maybe_parse(query, dialect=dialect, copy=copy, **opts)
-            if isinstance(subquery, Query):
-                subquery = subquery.subquery(copy=False)
-        unnest_list: list[ExpOrStr] = ensure_list(unnest)
-        return In(
-            this=maybe_copy(self, copy),
-            expressions=[convert(e, copy=copy) for e in expressions],
-            query=subquery,
-            unnest=(
-                _lazy_unnest(
-                    expressions=[
-                        maybe_parse(e, dialect=dialect, copy=copy, **opts) for e in unnest_list
-                    ]
-                )
-                if unnest
-                else None
-            ),
-        )
+        pass
 
     def between(
         self, low: t.Any, high: t.Any, copy: bool = True, symmetric: bool | None = None
     ) -> Between:
-        between = Between(
-            this=maybe_copy(self, copy),
-            low=convert(low, copy=copy),
-            high=convert(high, copy=copy),
-        )
-        if symmetric is not None:
-            between.set("symmetric", symmetric)
-
-        return between
+        pass
 
     def is_(self, other: ExpOrStr) -> Is:
         return self._binop(Is, other)
 
     def like(self, other: ExpOrStr) -> Like:
-        return self._binop(Like, other)
+        pass
 
     def ilike(self, other: ExpOrStr) -> ILike:
-        return self._binop(ILike, other)
+        pass
 
     def eq(self, other: t.Any) -> EQ:
         return self._binop(EQ, other)
@@ -1454,19 +1370,16 @@ class Expression(Expr):
         return self._binop(NEQ, other)
 
     def rlike(self, other: ExpOrStr) -> RegexpLike:
-        return self._binop(RegexpLike, other)
+        pass
 
     def div(self, other: ExpOrStr, typed: bool = False, safe: bool = False) -> Div:
-        div = self._binop(Div, other)
-        div.set("typed", typed)
-        div.set("safe", safe)
-        return div
+        pass
 
     def asc(self, nulls_first: bool = True) -> Ordered:
-        return Ordered(this=self.copy(), nulls_first=nulls_first)
+        pass
 
     def desc(self, nulls_first: bool = False) -> Ordered:
-        return Ordered(this=self.copy(), desc=True, nulls_first=nulls_first)
+        pass
 
     def __lt__(self, other: t.Any) -> LT:
         return self._binop(LT, other)
@@ -1600,11 +1513,11 @@ class Binary(Condition):
 
     @property
     def left(self) -> Expr:
-        return self.args["this"]
+        pass
 
     @property
     def right(self) -> Expr:
-        return self.args["expression"]
+        pass
 
 
 @trait
@@ -1662,7 +1575,7 @@ class Func(Condition):
 
     @classmethod
     def default_parser_mappings(cls) -> dict[str, t.Callable[[Sequence[object]], Self]]:
-        return {name: cls.from_arg_list for name in cls.sql_names()}
+        pass
 
 
 @trait
@@ -1679,22 +1592,20 @@ class Column(Expression, Condition):
 
     @property
     def db(self) -> str:
-        return self.text("db")
+        pass
 
     @property
     def catalog(self) -> str:
-        return self.text("catalog")
+        pass
 
     @property
     def output_name(self) -> str:
-        return self.name
+        pass
 
     @property
     def parts(self) -> list[Identifier | Star]:
         """Return the parts of a column in order catalog, db, table, name."""
-        return [
-            self.args[part] for part in ("catalog", "db", "table", "this") if self.args.get(part)
-        ]
+        pass
 
     def to_dot(self, include_dots: bool = True) -> Dot | Identifier | Star:
         """Converts the column into a dot expression."""
@@ -1732,7 +1643,7 @@ class Literal(Expression, Condition):
 
     @property
     def output_name(self) -> str:
-        return self.name
+        pass
 
     def to_py(self) -> int | str | Decimal:
         if self.is_number:
@@ -1770,11 +1681,11 @@ class Identifier(Expression):
 
     @property
     def quoted(self) -> bool:
-        return bool(self.args.get("quoted"))
+        pass
 
     @property
     def output_name(self) -> str:
-        return self.name
+        pass
 
 
 class Opclass(Expression):
@@ -1786,11 +1697,11 @@ class Star(Expression):
 
     @property
     def name(self) -> str:
-        return "*"
+        pass
 
     @property
     def output_name(self) -> str:
-        return self.name
+        pass
 
 
 class Parameter(Expression, Condition):
@@ -1806,7 +1717,7 @@ class Placeholder(Expression, Condition):
 
     @property
     def name(self) -> str:
-        return self.text("this") or "?"
+        pass
 
 
 class Null(Expression, Condition):
@@ -1814,7 +1725,7 @@ class Null(Expression, Condition):
 
     @property
     def name(self) -> str:
-        return "NULL"
+        pass
 
     def to_py(self) -> t.Literal[None]:
         return None
@@ -1830,15 +1741,15 @@ class Boolean(Expression, Condition):
 class Dot(Expression, Binary):
     @property
     def is_star(self) -> bool:
-        return self.expression.is_star
+        pass
 
     @property
     def name(self) -> str:
-        return self.expression.name
+        pass
 
     @property
     def output_name(self) -> str:
-        return self.name
+        pass
 
     @classmethod
     def build(cls, expressions: Sequence[Expr]) -> Dot:
@@ -1851,18 +1762,7 @@ class Dot(Expression, Binary):
     @property
     def parts(self) -> list[Expr]:
         """Return the parts of a table / column in order catalog, db, table."""
-        this, *parts = self.flatten()
-
-        parts.reverse()
-
-        for arg in COLUMN_PARTS:
-            part = this.args.get(arg)
-
-            if isinstance(part, Expr):
-                parts.append(part)
-
-        parts.reverse()
-        return parts
+        pass
 
 
 class Kwarg(Expression, Binary):
@@ -1874,7 +1774,7 @@ class Alias(Expression):
 
     @property
     def output_name(self) -> str:
-        return self.alias
+        pass
 
 
 class PivotAlias(Alias):
@@ -1890,7 +1790,7 @@ class Aliases(Expression):
 
     @property
     def aliases(self) -> list[Expr]:
-        return self.expressions
+        pass
 
 
 class Bracket(Expression, Condition):
@@ -1906,10 +1806,7 @@ class Bracket(Expression, Condition):
 
     @property
     def output_name(self) -> str:
-        if len(self.expressions) == 1:
-            return self.expressions[0].output_name
-
-        return super().output_name
+        pass
 
 
 class ForIn(Expression):
@@ -1946,7 +1843,7 @@ class Anonymous(Expression, Func):
 
     @property
     def name(self) -> str:
-        return self.this if isinstance(self.this, str) else self.this.name
+        pass
 
 
 class AnonymousAggFunc(Expression, AggFunc):
@@ -2017,7 +1914,7 @@ class TimeUnit(Expr):
 
     @property
     def unit(self) -> Expr | None:
-        return self.args.get("unit")
+        pass
 
 
 class _TimeUnit(Expression, TimeUnit):
@@ -2051,7 +1948,7 @@ class Ordered(Expression):
 
     @property
     def name(self) -> str:
-        return self.this.name
+        pass
 
 
 class Add(Expression, Binary):
@@ -2209,7 +2106,7 @@ class Not(Unary):
 class Paren(Unary):
     @property
     def output_name(self) -> str:
-        return self.this.name
+        pass
 
 
 class Neg(Unary):
@@ -2314,9 +2211,7 @@ def not_(
 
 
 def _lazy_unnest(**kwargs: object) -> Expr:
-    from sqlglot.expressions.array import Unnest
-
-    return Unnest(**kwargs)
+    pass
 
 
 def convert(value: t.Any, copy: bool = False) -> Expr:
@@ -2917,7 +2812,7 @@ def xor(
     Returns:
         The new condition
     """
-    return t.cast(Condition, _combine(expressions, Xor, dialect, copy=copy, wrap=wrap, **opts))
+    pass
 
 
 def paren(expression: ExpOrStr, copy: bool = True) -> Paren:

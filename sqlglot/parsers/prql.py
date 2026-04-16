@@ -13,9 +13,7 @@ def _select_all(table: exp.Expr) -> exp.Select | None:
 
 
 def _resolve_projection(s: exp.Expr, projections: dict[str, exp.Expr]) -> exp.Expr:
-    if isinstance(s, exp.Column) and s.name in projections:
-        return projections[s.name].copy()
-    return s
+    pass
 
 
 class PRQLParser(parser.Parser):
@@ -142,22 +140,7 @@ class PRQLParser(parser.Parser):
         return query.order_by(self.expression(exp.Order(expressions=expressions)), copy=False)
 
     def _parse_aggregate(self) -> exp.Expr | None:
-        alias = None
-        if self._next.token_type == TokenType.ALIAS:
-            alias = self._parse_id_var(any_token=True)
-            self._match(TokenType.ALIAS)
-
-        name = self._curr.text.upper()
-        func_builder = self.FUNCTIONS.get(name)
-        if func_builder:
-            self._advance()
-            args = self._parse_column()
-            func = func_builder([args])
-        else:
-            self.raise_error(f"Unsupported aggregation function {name}")
-        if alias:
-            return self.expression(exp.Alias(this=func, alias=alias))
-        return func
+        pass
 
     def _parse_expression(self) -> exp.Expr | None:
         if self._next.token_type == TokenType.ALIAS:

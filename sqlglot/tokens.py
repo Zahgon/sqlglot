@@ -585,7 +585,7 @@ class Tokenizer(_TokenizerBase):
     @property
     def size(self) -> int:
         """Length of the SQL string."""
-        return self._core.size
+        pass
 
     @property
     def tokens(self) -> list[Token]:

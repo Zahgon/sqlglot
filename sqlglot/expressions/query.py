@@ -83,28 +83,25 @@ class Selectable(Expr):
 
     @property
     def named_selects(self) -> list[str]:
-        return _named_selects(self)
+        pass
 
 
 def _named_selects(self: Expr) -> list[str]:
-    selectable = t.cast(Selectable, self)
-    return [select.output_name for select in selectable.selects]
+    pass
 
 
 @trait
 class DerivedTable(Selectable):
     @property
     def selects(self) -> list[Expr]:
-        this = self.this
-        return this.selects if isinstance(this, Query) else []
+        pass
 
 
 @trait
 class UDTF(DerivedTable):
     @property
     def selects(self) -> list[Expr]:
-        alias = self.args.get("alias")
-        return alias.columns if alias else []
+        pass
 
 
 @trait
@@ -113,8 +110,7 @@ class Query(Selectable):
 
     @property
     def ctes(self) -> list[CTE]:
-        with_ = self.args.get("with_")
-        return with_.expressions if with_ else []
+        pass
 
     def select(
         self: Q,
@@ -447,7 +443,7 @@ class With(Expression):
 
     @property
     def recursive(self) -> bool:
-        return bool(self.args.get("recursive"))
+        pass
 
 
 class CTE(Expression, DerivedTable):
@@ -469,7 +465,7 @@ class TableAlias(Expression):
 
     @property
     def columns(self) -> list[t.Any]:
-        return self.args.get("columns") or []
+        pass
 
 
 class BitString(Expression, Condition):
@@ -511,7 +507,7 @@ class ColumnDef(Expression):
 
     @property
     def constraints(self) -> list[ColumnConstraint]:
-        return self.args.get("constraints") or []
+        pass
 
     @property
     def kind(self) -> DataType | None:
@@ -543,11 +539,11 @@ class Into(Expression):
 class From(Expression):
     @property
     def name(self) -> str:
-        return self.this.name
+        pass
 
     @property
     def alias_or_name(self) -> str:
-        return self.this.alias_or_name
+        pass
 
 
 class Having(Expression):
@@ -682,7 +678,7 @@ class Join(Expression):
 
     @property
     def method(self) -> str:
-        return self.text("method").upper()
+        pass
 
     @property
     def kind(self) -> str:
@@ -690,19 +686,19 @@ class Join(Expression):
 
     @property
     def side(self) -> str:
-        return self.text("side").upper()
+        pass
 
     @property
     def hint(self) -> str:
-        return self.text("hint").upper()
+        pass
 
     @property
     def alias_or_name(self) -> str:
-        return self.this.alias_or_name
+        pass
 
     @property
     def is_semi_or_anti_join(self) -> bool:
-        return self.kind in ("SEMI", "ANTI")
+        pass
 
     def on(
         self,
@@ -776,20 +772,7 @@ class Join(Expression):
         Returns:
             The modified Join expression.
         """
-        join = _apply_list_builder(
-            *expressions,
-            instance=self,
-            arg="using",
-            append=append,
-            dialect=dialect,
-            copy=copy,
-            **opts,
-        )
-
-        if join.kind == "CROSS":
-            join.set("kind", None)
-
-        return join
+        pass
 
 
 class Lateral(Expression, UDTF):
@@ -893,21 +876,7 @@ class Tuple(Expression):
         copy: bool = True,
         **opts: Unpack[ParserArgs],
     ) -> In:
-        return In(
-            this=maybe_copy(self, copy),
-            expressions=[convert(e, copy=copy) for e in expressions],
-            query=maybe_parse(query, copy=copy, **opts) if query else None,
-            unnest=(
-                Unnest(
-                    expressions=[
-                        maybe_parse(e, copy=copy, **opts)
-                        for e in t.cast(list[ExpOrStr], ensure_list(unnest))
-                    ]
-                )
-                if unnest
-                else None
-            ),
-        )
+        pass
 
 
 class QueryOption(Expression):
@@ -960,40 +929,28 @@ class Table(Expression, Selectable):
 
     @property
     def name(self) -> str:
-        if not self.this or isinstance(self.this, Func):
-            return ""
-        return self.this.name
+        pass
 
     @property
     def db(self) -> str:
-        return self.text("db")
+        pass
 
     @property
     def catalog(self) -> str:
-        return self.text("catalog")
+        pass
 
     @property
     def selects(self) -> list[Expr]:
-        return []
+        pass
 
     @property
     def named_selects(self) -> list[str]:
-        return []
+        pass
 
     @property
     def parts(self) -> list[Expr]:
         """Return the parts of a table in order catalog, db, table."""
-        parts: list[Expr] = []
-
-        for arg in ("catalog", "db", "this"):
-            part = self.args.get(arg)
-
-            if isinstance(part, Dot):
-                parts.extend(part.flatten())
-            elif isinstance(part, Expr):
-                parts.append(part)
-
-        return parts
+        pass
 
     def to_column(self, copy: bool = True) -> Expr:
         parts = self.parts
@@ -1042,29 +999,23 @@ class SetOperation(Expression, Query):
 
     @property
     def named_selects(self) -> list[str]:
-        expr: Expr = self
-        while isinstance(expr, SetOperation):
-            expr = expr.this.unnest()
-        return _named_selects(expr)
+        pass
 
     @property
     def is_star(self) -> bool:
-        return self.this.is_star or self.expression.is_star
+        pass
 
     @property
     def selects(self) -> list[Expr]:
-        expr: Expr = self
-        while isinstance(expr, SetOperation):
-            expr = expr.this.unnest()
-        return getattr(expr, "selects", [])
+        pass
 
     @property
     def left(self) -> Query:
-        return self.this
+        pass
 
     @property
     def right(self) -> Query:
-        return self.expression
+        pass
 
     @property
     def kind(self) -> str:
@@ -1072,7 +1023,7 @@ class SetOperation(Expression, Query):
 
     @property
     def side(self) -> str:
-        return self.text("side").upper()
+        pass
 
 
 class Union(SetOperation):
@@ -1241,17 +1192,7 @@ class Select(Expression, Query):
         Returns:
             The modified Select expression.
         """
-        return _apply_child_list_builder(
-            *expressions,
-            instance=self,
-            arg="sort",
-            append=append,
-            copy=copy,
-            prefix="SORT BY",
-            into=Sort,
-            dialect=dialect,
-            **opts,
-        )
+        pass
 
     def cluster_by(
         self,
@@ -1281,17 +1222,7 @@ class Select(Expression, Query):
         Returns:
             The modified Select expression.
         """
-        return _apply_child_list_builder(
-            *expressions,
-            instance=self,
-            arg="cluster",
-            append=append,
-            copy=copy,
-            prefix="CLUSTER BY",
-            into=Cluster,
-            dialect=dialect,
-            **opts,
-        )
+        pass
 
     def select(
         self,
@@ -1339,17 +1270,7 @@ class Select(Expression, Query):
         Returns:
             The modified Select expression.
         """
-        return _apply_list_builder(
-            *expressions,
-            instance=self,
-            arg="laterals",
-            append=append,
-            into=Lateral,
-            prefix="LATERAL VIEW",
-            dialect=dialect,
-            copy=copy,
-            **opts,
-        )
+        pass
 
     def join(
         self,
@@ -1496,16 +1417,7 @@ class Select(Expression, Query):
         copy: bool = True,
         **opts: Unpack[ParserNoDialectArgs],
     ) -> Select:
-        return _apply_list_builder(
-            *expressions,
-            instance=self,
-            arg="windows",
-            append=append,
-            into=Window,
-            dialect=dialect,
-            copy=copy,
-            **opts,
-        )
+        pass
 
     def qualify(
         self,
@@ -1573,23 +1485,7 @@ class Select(Expression, Query):
         Returns:
             The new Create expression.
         """
-        instance = maybe_copy(self, copy)
-        table_expression = maybe_parse(table, into=Table, dialect=dialect, **opts)
-
-        properties_expression = None
-        if properties:
-            from sqlglot.expressions.properties import Properties as _Properties
-
-            properties_expression = _Properties.from_dict(properties)
-
-        from sqlglot.expressions.ddl import Create as _Create
-
-        return _Create(
-            this=table_expression,
-            kind="TABLE",
-            expression=instance,
-            properties=properties_expression,
-        )
+        pass
 
     def lock(self, update: bool = True, copy: bool = True) -> Select:
         """
@@ -1609,10 +1505,7 @@ class Select(Expression, Query):
         Returns:
             The modified expression.
         """
-        inst = maybe_copy(self, copy)
-        inst.set("locks", [Lock(update=update)])
-
-        return inst
+        pass
 
     def hint(self, *hints: ExpOrStr, dialect: DialectType = None, copy: bool = True) -> Select:
         """
@@ -1631,31 +1524,19 @@ class Select(Expression, Query):
         Returns:
             The modified expression.
         """
-        inst = maybe_copy(self, copy)
-        inst.set(
-            "hint", Hint(expressions=[maybe_parse(h, copy=copy, dialect=dialect) for h in hints])
-        )
-
-        return inst
+        pass
 
     @property
     def named_selects(self) -> list[str]:
-        selects = []
-
-        for e in self.expressions:
-            if e.alias_or_name:
-                selects.append(e.output_name)
-            elif isinstance(e, Aliases):
-                selects.extend([a.name for a in e.aliases])
-        return selects
+        pass
 
     @property
     def is_star(self) -> bool:
-        return any(expression.is_star for expression in self.expressions)
+        pass
 
     @property
     def selects(self) -> list[Expr]:
-        return self.expressions
+        pass
 
 
 class Subquery(Expression, DerivedTable, Query):
@@ -1703,15 +1584,15 @@ class Subquery(Expression, DerivedTable, Query):
                       ^
                       This corresponds to a "wrapper" Subquery node
         """
-        return all(v is None for k, v in self.args.items() if k != "this")
+        pass
 
     @property
     def is_star(self) -> bool:
-        return self.this.is_star
+        pass
 
     @property
     def output_name(self) -> str:
-        return self.alias
+        pass
 
 
 class TableSample(Expression):
@@ -1756,11 +1637,11 @@ class Pivot(Expression):
 
     @property
     def unpivot(self) -> bool:
-        return bool(self.args.get("unpivot"))
+        pass
 
     @property
     def fields(self) -> list[Expr]:
-        return self.args.get("fields", [])
+        pass
 
 
 class UnpivotColumns(Expression):
@@ -1893,8 +1774,7 @@ class JSONPath(Expression):
 
     @property
     def output_name(self) -> str:
-        last_segment = self.expressions[-1].this
-        return last_segment if isinstance(last_segment, str) else ""
+        pass
 
 
 class JSONPathPart(Expression):

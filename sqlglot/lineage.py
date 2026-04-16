@@ -41,37 +41,7 @@ class Node:
             queue.extend(reversed(node.downstream))
 
     def to_html(self, dialect: DialectType = None, **opts: Unpack[GraphHTMLArgs]) -> GraphHTML:
-        nodes = {}
-        edges = []
-
-        for node in self.walk():
-            if isinstance(node.expression, exp.Table):
-                label = f"FROM {node.expression.this}"
-                title = f"<pre>SELECT {node.name} FROM {node.expression.this}</pre>"
-                group = 1
-            else:
-                label = node.expression.sql(pretty=True, dialect=dialect)
-                source = node.source.transform(
-                    lambda n: (
-                        exp.Tag(this=n, prefix="<b>", postfix="</b>") if n is node.expression else n
-                    ),
-                    copy=False,
-                ).sql(pretty=True, dialect=dialect)
-                title = f"<pre>{source}</pre>"
-                group = 0
-
-            node_id = id(node)
-
-            nodes[node_id] = {
-                "id": node_id,
-                "label": label,
-                "title": title,
-                "group": group,
-            }
-
-            for d in node.downstream:
-                edges.append({"from": node_id, "to": id(d)})
-        return GraphHTML(nodes, edges, **opts)
+        pass
 
 
 def lineage(
@@ -470,4 +440,4 @@ class GraphHTML:
 </div>"""
 
     def _repr_html_(self) -> str:
-        return self.__str__()
+        pass

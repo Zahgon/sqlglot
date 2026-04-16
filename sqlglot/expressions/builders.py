@@ -604,15 +604,7 @@ def rename_table(
     Returns:
         Alter table expression
     """
-    old_table = to_table(old_name, dialect=dialect)
-    new_table = to_table(new_name, dialect=dialect)
-    return Alter(
-        this=old_table,
-        kind="TABLE",
-        actions=[
-            AlterRename(this=new_table),
-        ],
-    )
+    pass
 
 
 def rename_column(
@@ -634,16 +626,7 @@ def rename_column(
     Returns:
         Alter table expression
     """
-    table = to_table(table_name, dialect=dialect)
-    old_column = to_column(old_column_name, dialect=dialect)
-    new_column = to_column(new_column_name, dialect=dialect)
-    return Alter(
-        this=table,
-        kind="TABLE",
-        actions=[
-            RenameColumn(this=old_column, to=new_column, exists=exists),
-        ],
-    )
+    pass
 
 
 def replace_children(
@@ -761,20 +744,7 @@ def table_name(table: Table | str, dialect: DialectType = None, identify: bool =
     Returns:
         The table name.
     """
-
-    expr = maybe_parse(table, into=Table, dialect=dialect)
-
-    if not expr:
-        raise ValueError(f"Cannot parse {table}")
-
-    return ".".join(
-        (
-            part.sql(dialect=dialect, identify=True, copy=False, comments=False)
-            if identify or not SAFE_IDENTIFIER_RE.match(part.name)
-            else part.name
-        )
-        for part in expr.parts
-    )
+    pass
 
 
 def normalize_table_name(table: str | Table, dialect: DialectType = None, copy: bool = True) -> str:
@@ -818,25 +788,7 @@ def replace_tables(
     Returns:
         The mapped expression.
     """
-
-    mapping = {normalize_table_name(k, dialect=dialect): v for k, v in mapping.items()}
-
-    def _replace_tables(node: Expr) -> Expr:
-        if isinstance(node, Table) and node.meta.get("replace") is not False:
-            original = normalize_table_name(node, dialect=dialect)
-            new_name = mapping.get(original)
-
-            if new_name:
-                table = to_table(
-                    new_name,
-                    **{k: v for k, v in node.args.items() if k not in TABLE_PARTS},
-                    dialect=dialect,
-                )
-                table.add_comments([original])
-                return table
-        return node
-
-    return expression.transform(_replace_tables, copy=copy)  # type: ignore
+    pass
 
 
 def replace_placeholders(expression: Expr, *args: object, **kwargs: t.Any) -> Expr:
@@ -860,17 +812,7 @@ def replace_placeholders(expression: Expr, *args: object, **kwargs: t.Any) -> Ex
     """
 
     def _replace_placeholders(node: Expr, args: Iterator[object], **kwargs: object) -> Expr:
-        if isinstance(node, Placeholder):
-            if node.this:
-                new_name = kwargs.get(node.this)
-                if new_name is not None:
-                    return convert(new_name)
-            else:
-                try:
-                    return convert(next(args))
-                except StopIteration:
-                    pass
-        return node
+        pass
 
     return expression.transform(_replace_placeholders, iter(args), **kwargs)
 
@@ -903,20 +845,7 @@ def expand(
     normalized_sources = {normalize_table_name(k, dialect=dialect): v for k, v in sources.items()}
 
     def _expand(node: Expr):
-        if isinstance(node, Table):
-            name = normalize_table_name(node, dialect=dialect)
-            source = normalized_sources.get(name)
-
-            if source:
-                # Create a subquery with the same alias (or table name if no alias)
-                parsed_source = source() if callable(source) else source
-                subquery = parsed_source.subquery(node.alias or name)
-                subquery.comments = [f"source: {name}"]
-
-                # Continue expanding within the subquery
-                return subquery.transform(_expand, copy=False)
-
-        return node
+        pass
 
     return expression.transform(_expand, copy=copy)
 
@@ -1063,12 +992,7 @@ def tuple_(
     Returns:
         A tuple expression.
     """
-    return Tuple(
-        expressions=[
-            maybe_parse(expression, copy=copy, dialect=dialect, **kwargs)
-            for expression in expressions
-        ]
-    )
+    pass
 
 
 def true() -> Boolean:

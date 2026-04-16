@@ -112,7 +112,7 @@ class JSONExtract(Expression, Binary, Func):
 
     @property
     def output_name(self) -> str:
-        return self.expression.output_name if not self.expressions else ""
+        pass
 
 
 class JSONExtractArray(Expression, Func):
@@ -134,7 +134,7 @@ class JSONExtractScalar(Expression, Binary, Func):
 
     @property
     def output_name(self) -> str:
-        return self.expression.output_name
+        pass
 
 
 class JSONFormat(Expression, Func):

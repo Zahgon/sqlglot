@@ -81,10 +81,7 @@ def catch(*exceptions):
 
     def decorator(func):
         def wrapped(expression, *args, **kwargs):
-            try:
-                return func(expression, *args, **kwargs)
-            except exceptions:
-                return expression
+            pass
 
         return wrapped
 
@@ -93,28 +90,7 @@ def catch(*exceptions):
 
 def annotate_types_on_change(func):
     @wraps(func)
-    def _func(self, expression: exp.Expr, *args, **kwargs) -> exp.Expr | None:
-        new_expression: exp.Expr | None = func(self, expression, *args, **kwargs)
-
-        if new_expression is None:
-            return new_expression
-
-        if self.annotate_new_expressions and expression != new_expression:
-            self._annotator.clear()
-
-            # We annotate this to ensure new children nodes are also annotated
-            new_expression = self._annotator.annotate(
-                expression=new_expression,
-                annotate_scope=False,
-            )
-
-            # Whatever expression the original expression is transformed into needs to preserve
-            # the original type, otherwise the simplification could result in a different schema
-            new_expression.type = expression.type
-
-        return new_expression
-
-    return _func
+    pass
 
 
 def flatten(expression: exp.Expr) -> exp.Expr:
@@ -216,11 +192,11 @@ def propagate_constants(expression, root=True):
 
 
 def _is_number(expression: exp.Expr) -> bool:
-    return expression.is_number
+    pass
 
 
 def _is_interval(expression: exp.Expr) -> bool:
-    return isinstance(expression, exp.Interval) and extract_interval(expression) is not None
+    pass
 
 
 def _is_nonnull_constant(expression: exp.Expr) -> bool:
@@ -268,11 +244,7 @@ def _datetrunc_eq(
     dialect: Dialect,
     target_type: exp.DataType | None,
 ) -> exp.Expr | None:
-    drange = _datetrunc_range(date, unit, dialect)
-    if not drange:
-        return None
-
-    return _datetrunc_eq_expression(left, drange, target_type)
+    pass
 
 
 def _datetrunc_neq(
@@ -282,15 +254,7 @@ def _datetrunc_neq(
     dialect: Dialect,
     target_type: exp.DataType | None,
 ) -> exp.Expr | None:
-    drange = _datetrunc_range(date, unit, dialect)
-    if not drange:
-        return None
-
-    return exp.and_(
-        left < date_literal(drange[0], target_type),
-        left >= date_literal(drange[1], target_type),
-        copy=False,
-    )
+    pass
 
 
 def always_true(expression: object) -> bool:
@@ -308,7 +272,7 @@ def is_zero(expression: object) -> bool:
 
 
 def is_complement(a: object, b: object) -> bool:
-    return isinstance(b, exp.Not) and b.this == a
+    pass
 
 
 def is_false(a: object) -> bool:
@@ -798,38 +762,7 @@ class Simplifier:
     @annotate_types_on_change
     def simplify_connectors(self, expression: exp.Expr, root: bool = True) -> exp.Expr:
         def _simplify_connectors(expression: exp.Expr, left: exp.Expr, right: exp.Expr):
-            if isinstance(expression, exp.And):
-                if is_false(left) or is_false(right):
-                    return exp.false()
-                if is_zero(left) or is_zero(right):
-                    return exp.false()
-                if (
-                    (is_null(left) and is_null(right))
-                    or (is_null(left) and always_true(right))
-                    or (always_true(left) and is_null(right))
-                ):
-                    return exp.null()
-                if always_true(left) and always_true(right):
-                    return exp.true()
-                if always_true(left):
-                    return right
-                if always_true(right):
-                    return left
-                return self._simplify_comparison(expression, left, right)
-            elif isinstance(expression, exp.Or):
-                if always_true(left) or always_true(right):
-                    return exp.true()
-                if (
-                    (is_null(left) and is_null(right))
-                    or (is_null(left) and always_false(right))
-                    or (always_false(left) and is_null(right))
-                ):
-                    return exp.null()
-                if is_false(left):
-                    return right
-                if is_false(right):
-                    return left
-                return self._simplify_comparison(expression, left, right, or_=True)
+            pass
 
         if isinstance(expression, exp.Connector):
             original_parent = expression.parent
@@ -1538,159 +1471,103 @@ class Gen:
         return "".join(self.sqls)
 
     def add_sql(self, e: exp.Add) -> None:
-        self._binary(e, " + ")
+        pass
 
     def alias_sql(self, e: exp.Alias) -> None:
-        self.stack.extend(
-            (
-                e.args.get("alias"),
-                " AS ",
-                e.args.get("this"),
-            )
-        )
+        pass
 
     def and_sql(self, e: exp.And) -> None:
-        self._binary(e, " AND ")
+        pass
 
     def anonymous_sql(self, e: exp.Anonymous) -> None:
-        this = e.this
-        if isinstance(this, str):
-            name = this.upper()
-        elif isinstance(this, exp.Identifier):
-            name = this.this
-            name = f'"{name}"' if this.quoted else name.upper()
-        else:
-            raise ValueError(
-                f"Anonymous.this expects a str or an Identifier, got '{this.__class__.__name__}'."
-            )
-
-        self.stack.extend(
-            (
-                ")",
-                e.expressions,
-                "(",
-                name,
-            )
-        )
+        pass
 
     def between_sql(self, e: exp.Between) -> None:
-        self.stack.extend(
-            (
-                e.args.get("high"),
-                " AND ",
-                e.args.get("low"),
-                " BETWEEN ",
-                e.this,
-            )
-        )
+        pass
 
     def boolean_sql(self, e: exp.Boolean) -> None:
-        self.stack.append("TRUE" if e.this else "FALSE")
+        pass
 
     def bracket_sql(self, e: exp.Bracket) -> None:
-        self.stack.extend(
-            (
-                "]",
-                e.expressions,
-                "[",
-                e.this,
-            )
-        )
+        pass
 
     def column_sql(self, e: exp.Column) -> None:
-        for p in reversed(e.parts):
-            self.stack.extend((p, "."))
-        self.stack.pop()
+        pass
 
     def datatype_sql(self, e: exp.DataType) -> None:
-        self._args(e, 1)
-        self.stack.append(f"{e.this.name} ")
+        pass
 
     def div_sql(self, e: exp.Div) -> None:
-        self._binary(e, " / ")
+        pass
 
     def dot_sql(self, e: exp.Dot) -> None:
-        self._binary(e, ".")
+        pass
 
     def eq_sql(self, e: exp.EQ) -> None:
-        self._binary(e, " = ")
+        pass
 
     def from_sql(self, e: exp.From) -> None:
-        self.stack.extend((e.this, "FROM "))
+        pass
 
     def gt_sql(self, e: exp.GT) -> None:
-        self._binary(e, " > ")
+        pass
 
     def gte_sql(self, e: exp.GTE) -> None:
-        self._binary(e, " >= ")
+        pass
 
     def identifier_sql(self, e: exp.Identifier) -> None:
-        self.stack.append(f'"{e.this}"' if e.quoted else e.this)
+        pass
 
     def ilike_sql(self, e: exp.ILike) -> None:
-        self._binary(e, " ILIKE ")
+        pass
 
     def in_sql(self, e: exp.In) -> None:
-        self.stack.append(")")
-        self._args(e, 1)
-        self.stack.extend(
-            (
-                "(",
-                " IN ",
-                e.this,
-            )
-        )
+        pass
 
     def intdiv_sql(self, e: exp.IntDiv) -> None:
-        self._binary(e, " DIV ")
+        pass
 
     def is_sql(self, e: exp.Is) -> None:
-        self._binary(e, " IS ")
+        pass
 
     def like_sql(self, e: exp.Like) -> None:
         self._binary(e, " Like ")
 
     def literal_sql(self, e: exp.Literal) -> None:
-        self.stack.append(f"'{e.this}'" if e.is_string else e.this)
+        pass
 
     def lt_sql(self, e: exp.LT) -> None:
-        self._binary(e, " < ")
+        pass
 
     def lte_sql(self, e: exp.LTE) -> None:
-        self._binary(e, " <= ")
+        pass
 
     def mod_sql(self, e: exp.Mod) -> None:
-        self._binary(e, " % ")
+        pass
 
     def mul_sql(self, e: exp.Mul) -> None:
-        self._binary(e, " * ")
+        pass
 
     def neg_sql(self, e: exp.Neg) -> None:
-        self._unary(e, "-")
+        pass
 
     def neq_sql(self, e: exp.NEQ) -> None:
-        self._binary(e, " <> ")
+        pass
 
     def not_sql(self, e: exp.Not) -> None:
-        self._unary(e, "NOT ")
+        pass
 
     def null_sql(self, e: exp.Null) -> None:
-        self.stack.append("NULL")
+        pass
 
     def or_sql(self, e: exp.Or) -> None:
-        self._binary(e, " OR ")
+        pass
 
     def paren_sql(self, e: exp.Paren) -> None:
-        self.stack.extend(
-            (
-                ")",
-                e.this,
-                "(",
-            )
-        )
+        pass
 
     def sub_sql(self, e: exp.Sub) -> None:
-        self._binary(e, " - ")
+        pass
 
     def subquery_sql(self, e: exp.Subquery) -> None:
         self._args(e, 2)
@@ -1709,21 +1586,16 @@ class Gen:
         self.stack.pop()
 
     def tablealias_sql(self, e: exp.TableAlias) -> None:
-        columns = e.columns
-
-        if columns:
-            self.stack.extend((")", columns, "("))
-
-        self.stack.extend((e.this, " AS "))
+        pass
 
     def var_sql(self, e: exp.Var) -> None:
-        self.stack.append(e.this)
+        pass
 
     def _binary(self, e: exp.Binary, op: str) -> None:
         self.stack.extend((e.expression, op, e.this))
 
     def _unary(self, e: exp.Unary, op: str) -> None:
-        self.stack.extend((e.this, op))
+        pass
 
     def _function(self, e: exp.Func) -> None:
         self.stack.extend(

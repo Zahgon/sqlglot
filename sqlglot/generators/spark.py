@@ -31,38 +31,11 @@ def _normalize_partition(e: exp.Expr) -> exp.Expr:
 
 
 def _dateadd_sql(self: SparkGenerator, expression: exp.TsOrDsAdd | exp.TimestampAdd) -> str:
-    if not expression.unit or (
-        isinstance(expression, exp.TsOrDsAdd) and expression.text("unit").upper() == "DAY"
-    ):
-        # Coming from Hive/Spark2 DATE_ADD or roundtripping the 2-arg version of Spark3/DB
-        return self.func("DATE_ADD", expression.this, expression.expression)
-
-    this = self.func(
-        "DATE_ADD",
-        unit_to_var(expression),
-        expression.expression,
-        expression.this,
-    )
-
-    if isinstance(expression, exp.TsOrDsAdd):
-        # The 3 arg version of DATE_ADD produces a timestamp in Spark3/DB but possibly not
-        # in other dialects
-        return_type = expression.return_type
-        if not return_type.is_type(exp.DType.TIMESTAMP, exp.DType.DATETIME):
-            this = f"CAST({this} AS {return_type})"
-
-    return this
+    pass
 
 
 def _groupconcat_sql(self: SparkGenerator, expression: exp.GroupConcat) -> str:
-    if self.dialect.version < (4,):
-        expr = exp.ArrayToString(
-            this=exp.ArrayAgg(this=expression.this),
-            expression=expression.args.get("separator") or exp.Literal.string(""),
-        )
-        return self.sql(expr)
-
-    return groupconcat_sql(self, expression)
+    pass
 
 
 class SparkGenerator(Spark2Generator):
@@ -142,62 +115,25 @@ class SparkGenerator(Spark2Generator):
     }
 
     def ignorenulls_sql(self, expression: exp.IgnoreNulls) -> str:
-        return generator.Generator.ignorenulls_sql(self, expression)
+        pass
 
     def bracket_sql(self, expression: exp.Bracket) -> str:
-        if expression.args.get("safe"):
-            key = seq_get(self.bracket_offset_expressions(expression, index_offset=1), 0)
-            return self.func("TRY_ELEMENT_AT", expression.this, key)
-
-        return super().bracket_sql(expression)
+        pass
 
     def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
-        return f"GENERATED ALWAYS AS ({self.sql(expression, 'this')})"
+        pass
 
     def anyvalue_sql(self, expression: exp.AnyValue) -> str:
-        return self.function_fallback_sql(expression)
+        pass
 
     def datediff_sql(self, expression: exp.DateDiff) -> str:
-        end = self.sql(expression, "this")
-        start = self.sql(expression, "expression")
-
-        if expression.unit:
-            return self.func("DATEDIFF", unit_to_var(expression), start, end)
-
-        return self.func("DATEDIFF", end, start)
+        pass
 
     def placeholder_sql(self, expression: exp.Placeholder) -> str:
-        if not expression.args.get("widget"):
-            return super().placeholder_sql(expression)
-
-        return f"{{{expression.name}}}"
+        pass
 
     def readparquet_sql(self, expression: exp.ReadParquet) -> str:
-        if len(expression.expressions) != 1:
-            self.unsupported("READ_PARQUET with multiple arguments is not supported")
-            return ""
-
-        parquet_file = expression.expressions[0]
-        return f"parquet.`{parquet_file.name}`"
+        pass
 
     def ifblock_sql(self, expression: exp.IfBlock) -> str:
-        condition = expression.this
-        true_block = expression.args.get("true")
-
-        condition_expr = None
-        if isinstance(condition, exp.Not):
-            inner = condition.this
-            if isinstance(inner, exp.Is) and isinstance(inner.expression, exp.Null):
-                condition_expr = inner.this
-
-        if isinstance(condition_expr, exp.ObjectId):
-            object_type = condition_expr.expression
-            if (
-                (object_type is None or object_type.name.upper() == "U")
-                and isinstance(true_block, exp.Block)
-                and isinstance(drop := true_block.expressions[0], exp.Drop)
-            ):
-                drop.set("exists", True)
-                return self.sql(drop)
-
-        return super().ifblock_sql(expression)
+        pass

@@ -56,7 +56,7 @@ class Context:
 
     @property
     def columns(self) -> tuple:
-        return self.table.columns
+        pass
 
     def __iter__(self):
         self.env["scope"] = self.row_readers
@@ -70,15 +70,11 @@ class Context:
         return iter(self.tables[table])
 
     def filter(self, condition) -> None:
-        rows = [reader.row for reader, _ in self if self.eval(condition)]
-
-        for table in self.tables.values():
-            table.rows = rows
+        pass
 
     def sort(self, key) -> None:
         def sort_key(row: tuple) -> tuple:
-            self.set_row(row)
-            return tuple((t is None, t) for t in self.eval_tuple(key))
+            pass
 
         self.table.rows.sort(key=sort_key)
 

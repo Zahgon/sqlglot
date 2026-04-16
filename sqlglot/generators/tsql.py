@@ -30,71 +30,16 @@ BIT_TYPES = {exp.EQ, exp.NEQ, exp.Is, exp.In, exp.Select, exp.Alias}
 
 
 def _format_sql(self: TSQLGenerator, expression: exp.NumberToStr | exp.TimeToStr) -> str:
-    fmt = expression.args["format"]
-
-    if not isinstance(expression, exp.NumberToStr):
-        if fmt.is_string:
-            from sqlglot.dialects.tsql import TSQL
-
-            mapped_fmt = format_time(fmt.name, TSQL.INVERSE_TIME_MAPPING)
-            fmt_sql = self.sql(exp.Literal.string(mapped_fmt))
-        else:
-            fmt_sql = self.format_time(expression) or self.sql(fmt)
-    else:
-        fmt_sql = self.sql(fmt)
-
-    return self.func("FORMAT", expression.this, fmt_sql, expression.args.get("culture"))
+    pass
 
 
 def _string_agg_sql(self: TSQLGenerator, expression: exp.GroupConcat) -> str:
-    this = expression.this
-    distinct = expression.find(exp.Distinct)
-    if distinct:
-        # exp.Distinct can appear below an exp.Order or an exp.GroupConcat expression
-        self.unsupported("T-SQL STRING_AGG doesn't support DISTINCT.")
-        this = distinct.pop().expressions[0]
-
-    order = ""
-    if isinstance(expression.this, exp.Order):
-        if expression.this.this:
-            this = expression.this.this.pop()
-        # Order has a leading space
-        order = f" WITHIN GROUP ({self.sql(expression.this)[1:]})"
-
-    separator = expression.args.get("separator") or exp.Literal.string(",")
-    return f"STRING_AGG({self.format_args(this, separator)}){order}"
+    pass
 
 
 def qualify_derived_table_outputs(expression: exp.Expr) -> exp.Expr:
     """Ensures all (unnamed) output columns are aliased for CTEs and Subqueries."""
-    alias = expression.args.get("alias")
-
-    if (
-        isinstance(expression, (exp.CTE, exp.Subquery))
-        and isinstance(alias, exp.TableAlias)
-        and not alias.columns
-    ):
-        from sqlglot.optimizer.qualify_columns import qualify_outputs
-
-        # We keep track of the unaliased column projection indexes instead of the expressions
-        # themselves, because the latter are going to be replaced by new nodes when the aliases
-        # are added and hence we won't be able to reach these newly added Alias parents
-        query = expression.this
-        unaliased_column_indexes = (
-            i for i, c in enumerate(query.selects) if isinstance(c, exp.Column) and not c.alias
-        )
-
-        qualify_outputs(query)
-
-        # Preserve the quoting information of columns for newly added Alias nodes
-        query_selects = query.selects
-        for select_index in unaliased_column_indexes:
-            alias = query_selects[select_index]
-            column = alias.this
-            if isinstance(column.this, exp.Identifier):
-                alias.args["alias"].set("quoted", column.this.quoted)
-
-    return expression
+    pass
 
 
 def _json_extract_sql(
@@ -106,13 +51,7 @@ def _json_extract_sql(
 
 
 def _timestrtotime_sql(self: TSQLGenerator, expression: exp.TimeStrToTime):
-    sql = timestrtotime_sql(self, expression)
-    if expression.args.get("zone"):
-        # If there is a timezone, produce an expression like:
-        # CAST('2020-01-01 12:13:14-08:00' AS DATETIMEOFFSET) AT TIME ZONE 'UTC'
-        # If you dont have AT TIME ZONE 'UTC', wrapping that expression in another cast back to DATETIME2 just drops the timezone information
-        return self.sql(exp.AtTimeZone(this=sql, zone=exp.Literal.string("UTC")))
-    return sql
+    pass
 
 
 class TSQLGenerator(generator.Generator):
@@ -254,43 +193,16 @@ class TSQLGenerator(generator.Generator):
     }
 
     def scope_resolution(self, rhs: str, scope_name: str) -> str:
-        return f"{scope_name}::{rhs}"
+        pass
 
     def select_sql(self, expression: exp.Select) -> str:
-        limit = expression.args.get("limit")
-        offset = expression.args.get("offset")
-
-        if isinstance(limit, exp.Fetch) and not offset:
-            # Dialects like Oracle can FETCH directly from a row set but
-            # T-SQL requires an ORDER BY + OFFSET clause in order to FETCH
-            offset = exp.Offset(expression=exp.Literal.number(0))
-            expression.set("offset", offset)
-
-        if offset:
-            if not expression.args.get("order"):
-                # ORDER BY is required in order to use OFFSET in a query, so we use
-                # a noop order by, since we don't really care about the order.
-                # See: https://www.microsoftpressstore.com/articles/article.aspx?p=2314819
-                expression.order_by(exp.select(exp.null()).subquery(), copy=False)
-
-            if isinstance(limit, exp.Limit):
-                # TOP and OFFSET can't be combined, we need use FETCH instead of TOP
-                # we replace here because otherwise TOP would be generated in select_sql
-                limit.replace(exp.Fetch(direction="FIRST", count=limit.expression))
-
-        return super().select_sql(expression)
+        pass
 
     def convert_sql(self, expression: exp.Convert) -> str:
-        name = "TRY_CONVERT" if expression.args.get("safe") else "CONVERT"
-        return self.func(name, expression.this, expression.expression, expression.args.get("style"))
+        pass
 
     def queryoption_sql(self, expression: exp.QueryOption) -> str:
-        option = self.sql(expression, "this")
-        value = self.sql(expression, "expression")
-        if value:
-            optional_equal_sign = "= " if option in OPTIONS_THAT_REQUIRE_EQUAL else ""
-            return f"{option} {optional_equal_sign}{value}"
-        return option
+        pass
 
     def lateral_op(self, expression: exp.Lateral) -> str:
         cross_apply = expression.args.get("cross_apply")
@@ -304,321 +216,117 @@ class TSQLGenerator(generator.Generator):
         return "LATERAL"
 
     def splitpart_sql(self, expression: exp.SplitPart) -> str:
-        this = expression.this
-        split_count = len(this.name.split("."))
-        delimiter = expression.args.get("delimiter")
-        part_index = expression.args.get("part_index")
-
-        if (
-            not all(isinstance(arg, exp.Literal) for arg in (this, delimiter, part_index))
-            or (delimiter and delimiter.name != ".")
-            or not part_index
-            or split_count > 4
-        ):
-            self.unsupported(
-                "SPLIT_PART can be transpiled to PARSENAME only for '.' delimiter and literal values"
-            )
-            return ""
-
-        return self.func(
-            "PARSENAME", this, exp.Literal.number(split_count + 1 - part_index.to_py())
-        )
+        pass
 
     def extract_sql(self, expression: exp.Extract) -> str:
-        part = expression.this
-        name = DATE_PART_UNMAPPING.get(part.name.upper()) or part
-
-        return self.func("DATEPART", name, expression.expression)
+        pass
 
     def timefromparts_sql(self, expression: exp.TimeFromParts) -> str:
-        nano = expression.args.get("nano")
-        if nano is not None:
-            nano.pop()
-            self.unsupported("Specifying nanoseconds is not supported in TIMEFROMPARTS.")
-
-        if expression.args.get("fractions") is None:
-            expression.set("fractions", exp.Literal.number(0))
-        if expression.args.get("precision") is None:
-            expression.set("precision", exp.Literal.number(0))
-
-        return rename_func("TIMEFROMPARTS")(self, expression)
+        pass
 
     def timestampfromparts_sql(self, expression: exp.TimestampFromParts) -> str:
-        zone = expression.args.get("zone")
-        if zone is not None:
-            zone.pop()
-            self.unsupported("Time zone is not supported in DATETIMEFROMPARTS.")
-
-        nano = expression.args.get("nano")
-        if nano is not None:
-            nano.pop()
-            self.unsupported("Specifying nanoseconds is not supported in DATETIMEFROMPARTS.")
-
-        if expression.args.get("milli") is None:
-            expression.set("milli", exp.Literal.number(0))
-
-        return rename_func("DATETIMEFROMPARTS")(self, expression)
+        pass
 
     def setitem_sql(self, expression: exp.SetItem) -> str:
-        this = expression.this
-        if isinstance(this, exp.EQ) and not isinstance(this.left, exp.Parameter):
-            # T-SQL does not use '=' in SET command, except when the LHS is a variable.
-            return f"{self.sql(this.left)} {self.sql(this.right)}"
-
-        return super().setitem_sql(expression)
+        pass
 
     def boolean_sql(self, expression: exp.Boolean) -> str:
-        if type(expression.parent) in BIT_TYPES or isinstance(
-            expression.find_ancestor(exp.Values, exp.Select), exp.Values
-        ):
-            return "1" if expression.this else "0"
-
-        return "(1 = 1)" if expression.this else "(1 = 0)"
+        pass
 
     def is_sql(self, expression: exp.Is) -> str:
-        if isinstance(expression.expression, exp.Boolean):
-            return self.binary(expression, "=")
-        return self.binary(expression, "IS")
+        pass
 
     def createable_sql(self, expression: exp.Create, locations: defaultdict) -> str:
-        sql = self.sql(expression, "this")
-        properties = expression.args.get("properties")
-
-        if sql[:1] != "#" and any(
-            isinstance(prop, exp.TemporaryProperty)
-            for prop in (properties.expressions if properties else [])
-        ):
-            sql = f"[#{sql[1:]}" if sql.startswith("[") else f"#{sql}"
-
-        return sql
+        pass
 
     def create_sql(self, expression: exp.Create) -> str:
-        kind = expression.kind
-        exists = expression.args.get("exists")
-        expression.set("exists", None)
-
-        like_property = expression.find(exp.LikeProperty)
-        if like_property:
-            ctas_expression = like_property.this
-        else:
-            ctas_expression = expression.expression
-
-        if kind == "VIEW":
-            expression.this.set("catalog", None)
-            with_ = expression.args.get("with_")
-            if ctas_expression and with_:
-                # We've already preprocessed the Create expression to bubble up any nested CTEs,
-                # but CREATE VIEW actually requires the WITH clause to come after it so we need
-                # to amend the AST by moving the CTEs to the CREATE VIEW statement's query.
-                ctas_expression.set("with_", with_.pop())
-
-        table = expression.find(exp.Table)
-
-        # Convert CTAS statement to SELECT .. INTO ..
-        if kind == "TABLE" and ctas_expression:
-            if isinstance(ctas_expression, exp.UNWRAPPED_QUERIES):
-                ctas_expression = ctas_expression.subquery()
-
-            properties = expression.args.get("properties") or exp.Properties()
-            is_temp = any(isinstance(p, exp.TemporaryProperty) for p in properties.expressions)
-
-            select_into = exp.select("*").from_(exp.alias_(ctas_expression, "temp", table=True))
-            select_into.set("into", exp.Into(this=table, temporary=is_temp))
-
-            if like_property:
-                select_into.limit(0, copy=False)
-
-            sql = self.sql(select_into)
-        else:
-            sql = super().create_sql(expression)
-
-        if exists:
-            identifier = self.sql(exp.Literal.string(exp.table_name(table) if table else ""))
-            sql_with_ctes = self.prepend_ctes(expression, sql)
-            sql_literal = self.sql(exp.Literal.string(sql_with_ctes))
-            if kind == "SCHEMA":
-                return f"""IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = {identifier}) EXEC({sql_literal})"""
-            elif kind == "TABLE":
-                assert table
-                where = exp.and_(
-                    exp.column("TABLE_NAME").eq(table.name),
-                    exp.column("TABLE_SCHEMA").eq(table.db) if table.db else None,
-                    exp.column("TABLE_CATALOG").eq(table.catalog) if table.catalog else None,
-                )
-                return f"""IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE {where}) EXEC({sql_literal})"""
-            elif kind == "INDEX":
-                index = self.sql(exp.Literal.string(expression.this.text("this")))
-                return f"""IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = object_id({identifier}) AND name = {index}) EXEC({sql_literal})"""
-        elif expression.args.get("replace"):
-            sql = sql.replace("CREATE OR REPLACE ", "CREATE OR ALTER ", 1)
-
-        return self.prepend_ctes(expression, sql)
+        pass
 
     @generator.unsupported_args("unlogged", "expressions")
     def into_sql(self, expression: exp.Into) -> str:
-        if expression.args.get("temporary"):
-            # If the Into expression has a temporary property, push this down to the Identifier
-            table = expression.find(exp.Table)
-            if table and isinstance(table.this, exp.Identifier):
-                table.this.set("temporary", True)
-
-        return f"{self.seg('INTO')} {self.sql(expression, 'this')}"
+        pass
 
     def count_sql(self, expression: exp.Count) -> str:
-        func_name = "COUNT_BIG" if expression.args.get("big_int") else "COUNT"
-        return rename_func(func_name)(self, expression)
+        pass
 
     def datediff_sql(self, expression: exp.DateDiff) -> str:
-        func_name = "DATEDIFF_BIG" if expression.args.get("big_int") else "DATEDIFF"
-        return date_delta_sql(func_name)(self, expression)
+        pass
 
     def offset_sql(self, expression: exp.Offset) -> str:
-        return f"{super().offset_sql(expression)} ROWS"
+        pass
 
     def version_sql(self, expression: exp.Version) -> str:
-        name = "SYSTEM_TIME" if expression.name == "TIMESTAMP" else expression.name
-        this = f"FOR {name}"
-        expr = expression.expression
-        kind = expression.text("kind")
-        if kind in ("FROM", "BETWEEN"):
-            args = expr.expressions
-            sep = "TO" if kind == "FROM" else "AND"
-            expr_sql = f"{self.sql(seq_get(args, 0))} {sep} {self.sql(seq_get(args, 1))}"
-        else:
-            expr_sql = self.sql(expr)
-
-        expr_sql = f" {expr_sql}" if expr_sql else ""
-        return f"{this} {kind}{expr_sql}"
+        pass
 
     def returnsproperty_sql(self, expression: exp.ReturnsProperty) -> str:
-        table = expression.args.get("table")
-        table = f"{table} " if table else ""
-        return f"RETURNS {table}{self.sql(expression, 'this')}"
+        pass
 
     def returning_sql(self, expression: exp.Returning) -> str:
-        into = self.sql(expression, "into")
-        into = self.seg(f"INTO {into}") if into else ""
-        return f"{self.seg('OUTPUT')} {self.expressions(expression, flat=True)}{into}"
+        pass
 
     def transaction_sql(self, expression: exp.Transaction) -> str:
-        this = self.sql(expression, "this")
-        this = f" {this}" if this else ""
-        mark = self.sql(expression, "mark")
-        mark = f" WITH MARK {mark}" if mark else ""
-        return f"BEGIN TRANSACTION{this}{mark}"
+        pass
 
     def commit_sql(self, expression: exp.Commit) -> str:
-        this = self.sql(expression, "this")
-        this = f" {this}" if this else ""
-        durability = expression.args.get("durability")
-        durability = (
-            f" WITH (DELAYED_DURABILITY = {'ON' if durability else 'OFF'})"
-            if durability is not None
-            else ""
-        )
-        return f"COMMIT TRANSACTION{this}{durability}"
+        pass
 
     def rollback_sql(self, expression: exp.Rollback) -> str:
-        this = self.sql(expression, "this")
-        this = f" {this}" if this else ""
-        return f"ROLLBACK TRANSACTION{this}"
+        pass
 
     def identifier_sql(self, expression: exp.Identifier) -> str:
-        identifier = super().identifier_sql(expression)
-
-        if expression.args.get("global_"):
-            identifier = f"##{identifier}"
-        elif expression.args.get("temporary"):
-            identifier = f"#{identifier}"
-
-        return identifier
+        pass
 
     def constraint_sql(self, expression: exp.Constraint) -> str:
-        this = self.sql(expression, "this")
-        expressions = self.expressions(expression, flat=True, sep=" ")
-        return f"CONSTRAINT {this} {expressions}"
+        pass
 
     def length_sql(self, expression: exp.Length) -> str:
-        return self._uncast_text(expression, "LEN")
+        pass
 
     def right_sql(self, expression: exp.Right) -> str:
-        return self._uncast_text(expression, "RIGHT")
+        pass
 
     def left_sql(self, expression: exp.Left) -> str:
-        return self._uncast_text(expression, "LEFT")
+        pass
 
     def _uncast_text(self, expression: exp.Expr, name: str) -> str:
-        this = expression.this
-        if isinstance(this, exp.Cast) and this.is_type(exp.DType.TEXT):
-            this_sql = self.sql(this, "this")
-        else:
-            this_sql = self.sql(this)
-        expression_sql = self.sql(expression, "expression")
-        return self.func(name, this_sql, expression_sql if expression_sql else None)
+        pass
 
     def partition_sql(self, expression: exp.Partition) -> str:
-        return f"WITH (PARTITIONS({self.expressions(expression, flat=True)}))"
+        pass
 
     def alter_sql(self, expression: exp.Alter) -> str:
-        action = seq_get(expression.args.get("actions") or [], 0)
-        if isinstance(action, exp.AlterRename):
-            return f"EXEC sp_rename '{self.sql(expression.this)}', '{action.this.name}'"
-        return super().alter_sql(expression)
+        pass
 
     def drop_sql(self, expression: exp.Drop) -> str:
-        if expression.args["kind"] == "VIEW":
-            expression.this.set("catalog", None)
-        return super().drop_sql(expression)
+        pass
 
     def options_modifier(self, expression: exp.Expr) -> str:
         options = self.expressions(expression, key="options")
         return f" OPTION{self.wrap(options)}" if options else ""
 
     def dpipe_sql(self, expression: exp.DPipe) -> str:
-        return self.sql(reduce(lambda x, y: exp.Add(this=x, expression=y), expression.flatten()))
+        pass
 
     def isascii_sql(self, expression: exp.IsAscii) -> str:
-        return f"(PATINDEX(CONVERT(VARCHAR(MAX), 0x255b5e002d7f5d25) COLLATE Latin1_General_BIN, {self.sql(expression.this)}) = 0)"
+        pass
 
     def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
-        this = super().columndef_sql(expression, sep)
-        default = self.sql(expression, "default")
-        default = f" = {default}" if default else ""
-        output = self.sql(expression, "output")
-        output = f" {output}" if output else ""
-        return f"{this}{default}{output}"
+        pass
 
     def coalesce_sql(self, expression: exp.Coalesce) -> str:
-        func_name = "ISNULL" if expression.args.get("is_null") else "COALESCE"
-        return rename_func(func_name)(self, expression)
+        pass
 
     def storedprocedure_sql(self, expression: exp.StoredProcedure) -> str:
-        this = self.sql(expression, "this")
-        expressions = self.expressions(expression)
-        expressions = (
-            self.wrap(expressions) if expression.args.get("wrapped") else f" {expressions}"
-        )
-        return f"{this}{expressions}" if expressions.strip() != "" else this
+        pass
 
     def ifblock_sql(self, expression: exp.IfBlock) -> str:
-        this = self.sql(expression, "this")
-        true = self.sql(expression, "true")
-        true = f" {true}" if true else " "
-        false = self.sql(expression, "false")
-        false = f"; ELSE BEGIN {false}" if false else ""
-        return f"IF {this} BEGIN{true}{false}"
+        pass
 
     def whileblock_sql(self, expression: exp.WhileBlock) -> str:
-        this = self.sql(expression, "this")
-        body = self.sql(expression, "body")
-        body = f" {body}" if body else " "
-        return f"WHILE {this} BEGIN{body}"
+        pass
 
     def execute_sql(self, expression: exp.Execute) -> str:
-        this = self.sql(expression, "this")
-        expressions = self.expressions(expression)
-        expressions = f" {expressions}" if expressions else ""
-        return f"EXECUTE {this}{expressions}"
+        pass
 
     def executesql_sql(self, expression: exp.ExecuteSql) -> str:
-        return self.execute_sql(expression)
+        pass

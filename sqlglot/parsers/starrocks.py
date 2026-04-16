@@ -32,18 +32,7 @@ class StarRocksParser(MySQLParser):
     def _parse_rollup_property(self) -> exp.RollupProperty:
         # ROLLUP (rollup_name (col1, col2) [FROM from_index] [PROPERTIES (...)], ...)
         def parse_rollup_index() -> exp.RollupIndex:
-            return self.expression(
-                exp.RollupIndex(
-                    this=self._parse_id_var(),
-                    expressions=self._parse_wrapped_id_vars(),
-                    from_index=self._parse_id_var() if self._match_text_seq("FROM") else None,
-                    properties=self.expression(
-                        exp.Properties(expressions=self._parse_wrapped_properties())
-                    )
-                    if self._match_text_seq("PROPERTIES")
-                    else None,
-                )
-            )
+            pass
 
         return self.expression(
             exp.RollupProperty(expressions=self._parse_wrapped_csv(parse_rollup_index))
@@ -118,15 +107,7 @@ class StarRocksParser(MySQLParser):
         )
 
     def _parse_partitioning_granularity_dynamic(self) -> exp.PartitionByRangePropertyDynamic:
-        self._match_text_seq("START")
-        start = self._parse_wrapped(self._parse_string)
-        self._match_text_seq("END")
-        end = self._parse_wrapped(self._parse_string)
-        self._match_text_seq("EVERY")
-        every = self._parse_wrapped(lambda: self._parse_interval() or self._parse_number())
-        return self.expression(
-            exp.PartitionByRangePropertyDynamic(start=start, end=end, every=every)
-        )
+        pass
 
     def _parse_refresh_property(self) -> exp.RefreshTriggerProperty:
         """

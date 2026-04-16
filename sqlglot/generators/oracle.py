@@ -12,12 +12,7 @@ from sqlglot.dialects.dialect import (
 
 
 def _trim_sql(self: OracleGenerator, expression: exp.Trim) -> str:
-    position = expression.args.get("position")
-
-    if position and position.upper() in ("LEADING", "TRAILING"):
-        return self.trim_sql(expression)
-
-    return trim_sql(self, expression)
+    pass
 
 
 class OracleGenerator(generator.Generator):
@@ -109,57 +104,31 @@ class OracleGenerator(generator.Generator):
     }
 
     def currenttimestamp_sql(self, expression: exp.CurrentTimestamp) -> str:
-        if expression.args.get("sysdate"):
-            return "SYSDATE"
-
-        this = expression.this
-        return self.func("CURRENT_TIMESTAMP", this) if this else "CURRENT_TIMESTAMP"
+        pass
 
     def offset_sql(self, expression: exp.Offset) -> str:
-        return f"{super().offset_sql(expression)} ROWS"
+        pass
 
     def add_column_sql(self, expression: exp.Expr) -> str:
-        return f"ADD {self.sql(expression)}"
+        pass
 
     def queryoption_sql(self, expression: exp.QueryOption) -> str:
-        option = self.sql(expression, "this")
-        value = self.sql(expression, "expression")
-        value = f" CONSTRAINT {value}" if value else ""
-
-        return f"{option}{value}"
+        pass
 
     def coalesce_sql(self, expression: exp.Coalesce) -> str:
-        func_name = "NVL" if expression.args.get("is_nvl") else "COALESCE"
-        return rename_func(func_name)(self, expression)
+        pass
 
     def into_sql(self, expression: exp.Into) -> str:
-        into = "INTO" if not expression.args.get("bulk_collect") else "BULK COLLECT INTO"
-        if expression.this:
-            return f"{self.seg(into)} {self.sql(expression, 'this')}"
-
-        return f"{self.seg(into)} {self.expressions(expression)}"
+        pass
 
     def hint_sql(self, expression: exp.Hint) -> str:
-        expressions = []
-
-        for hint in expression.expressions:
-            if isinstance(hint, exp.Anonymous):
-                formatted_args = self.format_args(*hint.expressions, sep=" ")
-                expressions.append(f"{self.sql(hint, 'this')}({formatted_args})")
-            else:
-                expressions.append(self.sql(hint))
-
-        return f" /*+ {self.expressions(sqls=expressions, sep=self.QUERY_HINT_SEP).strip()} */"
+        pass
 
     def isascii_sql(self, expression: exp.IsAscii) -> str:
-        return f"NVL(REGEXP_LIKE({self.sql(expression.this)}, '^[' || CHR(1) || '-' || CHR(127) || ']*$'), TRUE)"
+        pass
 
     def interval_sql(self, expression: exp.Interval) -> str:
-        return f"{'INTERVAL ' if isinstance(expression.this, exp.Literal) else ''}{self.sql(expression, 'this')} {self.sql(expression, 'unit')}"
+        pass
 
     def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
-        param_constraint = expression.find(exp.InOutColumnConstraint)
-        if param_constraint:
-            sep = f" {self.sql(param_constraint)} "
-            param_constraint.pop()
-        return super().columndef_sql(expression, sep)
+        pass

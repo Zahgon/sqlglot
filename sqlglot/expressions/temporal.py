@@ -148,7 +148,7 @@ class TsOrDsAdd(Expression, Func, TimeUnit):
 
     @property
     def return_type(self) -> DataType:
-        return DataType.build(self.args.get("return_type") or DType.DATE)
+        pass
 
 
 class TsOrDsDiff(Expression, Func, TimeUnit):
@@ -184,7 +184,7 @@ class DateTrunc(Expression, Func):
 
     @property
     def unit(self) -> Expr:
-        return self.args["unit"]
+        pass
 
 
 class TimestampTrunc(Expression, Func, TimeUnit):

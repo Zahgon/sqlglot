@@ -24,30 +24,17 @@ def _build_datetime_format(
     expr_type: Type[E],
 ) -> t.Callable[[list], E]:
     def _builder(args: list) -> E:
-        expr = build_formatted_time(expr_type, "clickhouse")(args)
-
-        timezone = seq_get(args, 2)
-        if timezone:
-            expr.set("zone", timezone)
-
-        return expr
+        pass
 
     return _builder
 
 
 def _build_count_if(args: list) -> exp.CountIf | exp.CombinedAggFunc:
-    if len(args) == 1:
-        return exp.CountIf(this=seq_get(args, 0))
-
-    return exp.CombinedAggFunc(this="countIf", expressions=args)
+    pass
 
 
 def _build_str_to_date(args: list) -> exp.Cast | exp.Anonymous:
-    if len(args) == 3:
-        return exp.Anonymous(this="STR_TO_DATE", expressions=args)
-
-    strtodate = exp.StrToDate.from_arg_list(args)
-    return exp.cast(strtodate, exp.DType.DATETIME.into_expr())
+    pass
 
 
 def _build_timestamp_trunc(unit: str) -> t.Callable[[list], exp.TimestampTrunc]:
@@ -57,13 +44,7 @@ def _build_timestamp_trunc(unit: str) -> t.Callable[[list], exp.TimestampTrunc]:
 
 
 def _build_split_by_char(args: list) -> exp.Split | exp.Anonymous:
-    sep = seq_get(args, 0)
-    if isinstance(sep, exp.Literal):
-        sep_value = sep.to_py()
-        if isinstance(sep_value, str) and len(sep_value.encode("utf-8")) == 1:
-            return _build_split(exp.Split)(args)
-
-    return exp.Anonymous(this="splitByChar", expressions=args)
+    pass
 
 
 def _build_split(exp_class: Type[E]) -> t.Callable[[list], E]:

@@ -22,15 +22,7 @@ def canonicalize(expression: exp.Expr, dialect: DialectType = None) -> exp.Expr:
     _dialect = Dialect.get_or_raise(dialect)
 
     def _canonicalize(expression: exp.Expr) -> exp.Expr:
-        if not isinstance(expression, _CANONICALIZE_TYPES):
-            return expression
-        expression = add_text_to_concat(expression)
-        expression = replace_date_funcs(expression, dialect=_dialect)
-        expression = coerce_type(expression, _dialect.PROMOTE_TO_INFERRED_DATETIME_TYPE)
-        expression = remove_redundant_casts(expression)
-        expression = ensure_bools(expression, _replace_int_predicate)
-        expression = remove_ascending_order(expression)
-        return expression
+        pass
 
     return exp.replace_tree(expression, _canonicalize)
 
@@ -251,8 +243,4 @@ def _replace_cast(node: exp.Expr, to: exp.DATA_TYPE) -> None:
 # presto has a boolean type whereas tsql doesn't (people use bits)
 # with y as (select true as x) select x = 0 FROM y -- illegal presto query
 def _replace_int_predicate(expression: exp.Expr) -> None:
-    if isinstance(expression, exp.Coalesce):
-        for child in expression.iter_expressions():
-            _replace_int_predicate(child)
-    elif expression.type and expression.type.this in exp.DataType.INTEGER_TYPES:
-        expression.replace(expression.neq(0))
+    pass

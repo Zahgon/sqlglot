@@ -325,68 +325,23 @@ class PythonExecutor:
 
 
 def _ordered_py(self, expression):
-    this = self.sql(expression, "this")
-    desc = "True" if expression.args.get("desc") else "False"
-    nulls_first = "True" if expression.args.get("nulls_first") else "False"
-    return f"ORDERED({this}, {desc}, {nulls_first})"
+    pass
 
 
 def _rename(self, e):
-    try:
-        values = list(e.args.values())
-
-        if len(values) == 1:
-            values = values[0]
-            if not isinstance(values, list):
-                return self.func(e.key, values)
-            return self.func(e.key, *values)
-
-        if isinstance(e, exp.Func) and e.is_var_len_args:
-            args = itertools.chain.from_iterable(x if isinstance(x, list) else [x] for x in values)
-            return self.func(e.key, *args)
-
-        return self.func(e.key, *values)
-    except Exception as ex:
-        raise Exception(f"Could not rename {repr(e)}") from ex
+    pass
 
 
 def _case_sql(self, expression):
-    this = self.sql(expression, "this")
-    chain = self.sql(expression, "default") or "None"
-
-    for e in reversed(expression.args["ifs"]):
-        true = self.sql(e, "true")
-        condition = self.sql(e, "this")
-        condition = f"{this} = ({condition})" if this else condition
-        chain = f"{true} if {condition} else ({chain})"
-
-    return chain
+    pass
 
 
 def _lambda_sql(self, e: exp.Lambda) -> str:
-    names = {e.name.lower() for e in e.expressions}
-
-    e = e.transform(
-        lambda n: (
-            exp.var(n.name) if isinstance(n, exp.Identifier) and n.name.lower() in names else n
-        )
-    ).assert_is(exp.Lambda)
-
-    return f"lambda {self.expressions(e, flat=True)}: {self.sql(e, 'this')}"
+    pass
 
 
 def _div_sql(self: generator.Generator, e: exp.Div) -> str:
-    denominator = self.sql(e, "expression")
-
-    if e.args.get("safe"):
-        denominator += " or None"
-
-    sql = f"DIV({self.sql(e, 'this')}, {denominator})"
-
-    if e.args.get("typed"):
-        sql = f"int({sql})"
-
-    return sql
+    pass
 
 
 class Python(Dialect):

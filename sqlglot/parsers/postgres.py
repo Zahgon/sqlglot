@@ -45,22 +45,7 @@ def _build_regexp_replace(args: list, dialect: DialectType = None) -> exp.Regexp
     # Any one of `start`, `N` and `flags` can be column references, meaning that
     # unless we can statically see that the last argument is a non-integer string
     # (eg. not '0'), then it's not possible to construct the correct AST
-    regexp_replace = None
-    if len(args) > 3:
-        last = args[-1]
-        if not is_int(last.name):
-            if not last.type or last.is_type(exp.DType.UNKNOWN, exp.DType.NULL):
-                from sqlglot.optimizer.annotate_types import annotate_types
-
-                last = annotate_types(last, dialect=dialect)
-
-            if last.is_type(*exp.DataType.TEXT_TYPES):
-                regexp_replace = exp.RegexpReplace.from_arg_list(args[:-1])
-                regexp_replace.set("modifiers", last)
-
-    regexp_replace = regexp_replace or exp.RegexpReplace.from_arg_list(args)
-    regexp_replace.set("single_replace", True)
-    return regexp_replace
+    pass
 
 
 def _build_levenshtein_less_equal(args: list) -> exp.Levenshtein:
@@ -68,16 +53,7 @@ def _build_levenshtein_less_equal(args: list) -> exp.Levenshtein:
     # max_dist is the last argument
     # levenshtein_less_equal(source, target, ins_cost, del_cost, sub_cost, max_d)
     # levenshtein_less_equal(source, target, max_d)
-    max_dist = args.pop()
-
-    return exp.Levenshtein(
-        this=seq_get(args, 0),
-        expression=seq_get(args, 1),
-        ins_cost=seq_get(args, 2),
-        del_cost=seq_get(args, 3),
-        sub_cost=seq_get(args, 4),
-        max_dist=max_dist,
-    )
+    pass
 
 
 class PostgresParser(parser.Parser):
@@ -213,42 +189,7 @@ class PostgresParser(parser.Parser):
         Returns:
             Mode token type if current token is a mode keyword, None otherwise.
         """
-        if not self._match_set(self.ARG_MODE_TOKENS, advance=False) or not self._next:
-            return None
-
-        mode_token = self._curr
-
-        # Check Pattern 1: MODE TYPE
-        # Try parsing next token as a built-in type (not UDT)
-        # If successful, the keyword is an identifier, not a mode
-        is_followed_by_builtin_type = self._try_parse(
-            lambda: (
-                self._advance()  # type: ignore
-                or self._parse_types(check_func=False, allow_identifiers=False)
-            ),
-            retreat=True,
-        )
-        if is_followed_by_builtin_type:
-            return None  # Pattern: "out INT" -> out is parameter name
-
-        # Check Pattern 2: MODE NAME TYPE
-        # If next token is an identifier, check if there's a type after it
-        # The type can be built-in or user-defined (allow_identifiers=True)
-        if self._next.token_type not in self.ID_VAR_TOKENS:
-            return None
-
-        is_followed_by_any_type = self._try_parse(
-            lambda: (
-                self._advance(2)  # type: ignore
-                or self._parse_types(check_func=False, allow_identifiers=True)
-            ),
-            retreat=True,
-        )
-
-        if is_followed_by_any_type:
-            return mode_token.token_type  # Pattern: "OUT x INT" -> OUT is mode
-
-        return None
+        pass
 
     def _create_mode_constraint(self, param_mode: TokenType) -> exp.InOutColumnConstraint:
         """
@@ -260,32 +201,10 @@ class PostgresParser(parser.Parser):
         Returns:
             InOutColumnConstraint expression representing the parameter mode.
         """
-        return self.expression(
-            exp.InOutColumnConstraint(
-                input_=(param_mode in {TokenType.IN, TokenType.INOUT}),
-                output=(param_mode in {TokenType.OUT, TokenType.INOUT}),
-                variadic=(param_mode == TokenType.VARIADIC),
-            )
-        )
+        pass
 
     def _parse_function_parameter(self) -> exp.Expr | None:
-        param_mode = self._parse_parameter_mode()
-
-        if param_mode:
-            self._advance()
-
-        # Parse parameter name and type
-        param_name = self._parse_id_var()
-        column_def = self._parse_column_def(this=param_name, computed_column=False)
-
-        # Attach mode as constraint
-        if param_mode and column_def:
-            constraint = self._create_mode_constraint(param_mode)
-            if not column_def.args.get("constraints"):
-                column_def.set("constraints", [])
-            column_def.args["constraints"].insert(0, constraint)
-
-        return column_def
+        pass
 
     def _parse_query_parameter(self) -> exp.Expr | None:
         this = (

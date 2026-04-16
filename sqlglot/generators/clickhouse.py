@@ -49,118 +49,30 @@ def _unix_to_time_sql(self: ClickHouseGenerator, expression: exp.UnixToTime) -> 
 
 
 def _lower_func(sql: str) -> str:
-    index = sql.index("(")
-    return sql[:index].lower() + sql[index:]
+    pass
 
 
 def _quantile_sql(self: ClickHouseGenerator, expression: exp.Quantile) -> str:
-    quantile = expression.args["quantile"]
-    args = f"({self.sql(expression, 'this')})"
-
-    if isinstance(quantile, exp.Array):
-        func = self.func("quantiles", *quantile)
-    else:
-        func = self.func("quantile", quantile)
-
-    return func + args
+    pass
 
 
 def _datetime_delta_sql(name: str) -> t.Callable[[generator.Generator, DATETIME_DELTA], str]:
     def _delta_sql(self: generator.Generator, expression: DATETIME_DELTA) -> str:
-        if not expression.unit:
-            return rename_func(name)(self, expression)
-
-        return self.func(
-            name,
-            unit_to_var(expression),
-            expression.expression,
-            expression.this,
-            expression.args.get("zone"),
-        )
+        pass
 
     return _delta_sql
 
 
 def _timestrtotime_sql(self: ClickHouseGenerator, expression: exp.TimeStrToTime):
-    ts = expression.this
-
-    tz = expression.args.get("zone")
-    if tz and isinstance(ts, exp.Literal):
-        # Clickhouse will not accept timestamps that include a UTC offset, so we must remove them.
-        # The first step to removing is parsing the string with `datetime.datetime.fromisoformat`.
-        #
-        # In python <3.11, `fromisoformat()` can only parse timestamps of millisecond (3 digit)
-        # or microsecond (6 digit) precision. It will error if passed any other number of fractional
-        # digits, so we extract the fractional seconds and pad to 6 digits before parsing.
-        ts_string = ts.name.strip()
-
-        # separate [date and time] from [fractional seconds and UTC offset]
-        ts_parts = ts_string.split(".")
-        if len(ts_parts) == 2:
-            # separate fractional seconds and UTC offset
-            offset_sep = "+" if "+" in ts_parts[1] else "-"
-            ts_frac_parts = ts_parts[1].split(offset_sep)
-            num_frac_parts = len(ts_frac_parts)
-
-            # pad to 6 digits if fractional seconds present
-            ts_frac_parts[0] = ts_frac_parts[0].ljust(6, "0")
-            ts_string = "".join(
-                [
-                    ts_parts[0],  # date and time
-                    ".",
-                    ts_frac_parts[0],  # fractional seconds
-                    offset_sep if num_frac_parts > 1 else "",
-                    ts_frac_parts[1] if num_frac_parts > 1 else "",  # utc offset (if present)
-                ]
-            )
-
-        # return literal with no timezone, eg turn '2020-01-01 12:13:14-08:00' into '2020-01-01 12:13:14'
-        # this is because Clickhouse encodes the timezone as a data type parameter and throws an error if
-        # it's part of the timestamp string
-        ts_without_tz = (
-            datetime.datetime.fromisoformat(ts_string).replace(tzinfo=None).isoformat(sep=" ")
-        )
-        ts = exp.Literal.string(ts_without_tz)
-
-    # Non-nullable DateTime64 with microsecond precision
-    expressions = [exp.DataTypeParam(this=tz)] if tz else []
-    datatype = exp.DType.DATETIME64.into_expr(
-        expressions=[exp.DataTypeParam(this=exp.Literal.number(6)), *expressions],
-        nullable=False,
-    )
-
-    return self.sql(exp.cast(ts, datatype, dialect=self.dialect))
+    pass
 
 
 def _map_sql(self: ClickHouseGenerator, expression: exp.Map | exp.VarMap) -> str:
-    if not (expression.parent and expression.parent.arg_key == "settings"):
-        return _lower_func(var_map_sql(self, expression))
-
-    keys = expression.args.get("keys")
-    values = expression.args.get("values")
-
-    if not isinstance(keys, exp.Array) or not isinstance(values, exp.Array):
-        self.unsupported("Cannot convert array columns into map.")
-        return ""
-
-    args = []
-    for key, value in zip(keys.expressions, values.expressions):
-        args.append(f"{self.sql(key)}: {self.sql(value)}")
-
-    csv_args = ", ".join(args)
-
-    return f"{{{csv_args}}}"
+    pass
 
 
 def _json_cast_sql(self: ClickHouseGenerator, expression: exp.JSONCast) -> str:
-    this = self.sql(expression, "this")
-    to = expression.to
-    to_sql = self.sql(to)
-
-    if to.expressions:
-        to_sql = self.sql(exp.to_identifier(to_sql))
-
-    return f"{this}.:{to_sql}"
+    pass
 
 
 class ClickHouseGenerator(generator.Generator):
@@ -443,25 +355,10 @@ class ClickHouseGenerator(generator.Generator):
         return self.func("groupConcat", this)
 
     def offset_sql(self, expression: exp.Offset) -> str:
-        offset = super().offset_sql(expression)
-
-        # OFFSET ... FETCH syntax requires a "ROW" or "ROWS" keyword
-        # https://clickhouse.com/docs/sql-reference/statements/select/offset
-        parent = expression.parent
-        if isinstance(parent, exp.Select) and isinstance(parent.args.get("limit"), exp.Fetch):
-            offset = f"{offset} ROWS"
-
-        return offset
+        pass
 
     def strtodate_sql(self, expression: exp.StrToDate) -> str:
-        strtodate_sql = self.function_fallback_sql(expression)
-
-        if not isinstance(expression.parent, exp.Cast):
-            # StrToDate returns DATEs in other dialects (eg. postgres), so
-            # this branch aims to improve the transpilation to clickhouse
-            return self.cast_sql(exp.cast(expression, "DATE"))
-
-        return strtodate_sql
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         this = expression.this
@@ -484,7 +381,7 @@ class ClickHouseGenerator(generator.Generator):
         return str(int(this) + 1) if is_int(this) else this
 
     def likeproperty_sql(self, expression: exp.LikeProperty) -> str:
-        return f"AS {self.sql(expression, 'this')}"
+        pass
 
     def _any_to_has(
         self,
@@ -492,67 +389,27 @@ class ClickHouseGenerator(generator.Generator):
         default: t.Callable[[t.Any], str],
         prefix: str = "",
     ) -> str:
-        if isinstance(expression.left, exp.Any):
-            arr = expression.left
-            this = expression.right
-        elif isinstance(expression.right, exp.Any):
-            arr = expression.right
-            this = expression.left
-        else:
-            return default(expression)
-
-        return prefix + self.func("has", arr.this.unnest(), this)
+        pass
 
     def eq_sql(self, expression: exp.EQ) -> str:
-        return self._any_to_has(expression, super().eq_sql)
+        pass
 
     def neq_sql(self, expression: exp.NEQ) -> str:
-        return self._any_to_has(expression, super().neq_sql, "NOT ")
+        pass
 
     def regexpilike_sql(self, expression: exp.RegexpILike) -> str:
         # Manually add a flag to make the search case-insensitive
-        regex = self.func("CONCAT", "'(?i)'", expression.expression)
-        return self.func("match", expression.this, regex)
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
         # String is the standard ClickHouse type, every other variant is just an alias.
         # Additionally, any supplied length parameter will be ignored.
         #
         # https://clickhouse.com/docs/en/sql-reference/data-types/string
-        if expression.this in self.STRING_TYPE_MAPPING:
-            dtype = "String"
-        else:
-            dtype = super().datatype_sql(expression)
-
-        # This section changes the type to `Nullable(...)` if the following conditions hold:
-        # - It's marked as nullable - this ensures we won't wrap ClickHouse types with `Nullable`
-        #   and change their semantics
-        # - It's not the key type of a `Map`. This is because ClickHouse enforces the following
-        #   constraint: "Type of Map key must be a type, that can be represented by integer or
-        #   String or FixedString (possibly LowCardinality) or UUID or IPv6"
-        # - It's not a composite type, e.g. `Nullable(Array(...))` is not a valid type
-        parent = expression.parent
-        nullable = expression.args.get("nullable")
-        if nullable is True or (
-            nullable is None
-            and not (
-                isinstance(parent, exp.DataType)
-                and parent.is_type(exp.DType.MAP, check_nullable=True)
-                and expression.index in (None, 0)
-            )
-            and not expression.is_type(*self.NON_NULLABLE_TYPES, check_nullable=True)
-        ):
-            dtype = f"Nullable({dtype})"
-
-        return dtype
+        pass
 
     def cte_sql(self, expression: exp.CTE) -> str:
-        if expression.args.get("scalar"):
-            this = self.sql(expression, "this")
-            alias = self.sql(expression, "alias")
-            return f"{this} AS {alias}"
-
-        return super().cte_sql(expression)
+        pass
 
     def after_limit_modifiers(self, expression: exp.Expr) -> list[str]:
         return super().after_limit_modifiers(expression) + [
@@ -569,117 +426,52 @@ class ClickHouseGenerator(generator.Generator):
         ]
 
     def placeholder_sql(self, expression: exp.Placeholder) -> str:
-        return f"{{{expression.name}: {self.sql(expression, 'kind')}}}"
+        pass
 
     def oncluster_sql(self, expression: exp.OnCluster) -> str:
-        return f"ON CLUSTER {self.sql(expression, 'this')}"
+        pass
 
     def createable_sql(self, expression: exp.Create, locations: defaultdict) -> str:
-        if expression.kind in self.ON_CLUSTER_TARGETS and locations.get(
-            exp.Properties.Location.POST_NAME
-        ):
-            this_name = self.sql(
-                expression.this if isinstance(expression.this, exp.Schema) else expression,
-                "this",
-            )
-            this_properties = " ".join(
-                [self.sql(prop) for prop in locations[exp.Properties.Location.POST_NAME]]
-            )
-            this_schema = self.schema_columns_sql(expression.this)
-            this_schema = f"{self.sep()}{this_schema}" if this_schema else ""
-
-            return f"{this_name}{self.sep()}{this_properties}{this_schema}"
-
-        return super().createable_sql(expression, locations)
+        pass
 
     def create_sql(self, expression: exp.Create) -> str:
         # The comment property comes last in CTAS statements, i.e. after the query
-        query = expression.expression
-        if isinstance(query, exp.Query):
-            comment_prop = expression.find(exp.SchemaCommentProperty)
-            if comment_prop:
-                comment_prop.pop()
-                query.replace(exp.paren(query))
-        else:
-            comment_prop = None
-
-        create_sql = super().create_sql(expression)
-
-        comment_sql = self.sql(comment_prop)
-        comment_sql = f" {comment_sql}" if comment_sql else ""
-
-        return f"{create_sql}{comment_sql}"
+        pass
 
     def prewhere_sql(self, expression: exp.PreWhere) -> str:
-        this = self.indent(self.sql(expression, "this"))
-        return f"{self.seg('PREWHERE')}{self.sep()}{this}"
+        pass
 
     def indexcolumnconstraint_sql(self, expression: exp.IndexColumnConstraint) -> str:
-        this = self.sql(expression, "this")
-        this = f" {this}" if this else ""
-        expr = self.sql(expression, "expression")
-        expr = f" {expr}" if expr else ""
-        index_type = self.sql(expression, "index_type")
-        index_type = f" TYPE {index_type}" if index_type else ""
-        granularity = self.sql(expression, "granularity")
-        granularity = f" GRANULARITY {granularity}" if granularity else ""
-
-        return f"INDEX{this}{expr}{index_type}{granularity}"
+        pass
 
     def partition_sql(self, expression: exp.Partition) -> str:
-        return f"PARTITION {self.expressions(expression, flat=True)}"
+        pass
 
     def partitionid_sql(self, expression: exp.PartitionId) -> str:
-        return f"ID {self.sql(expression.this)}"
+        pass
 
     def replacepartition_sql(self, expression: exp.ReplacePartition) -> str:
-        return f"REPLACE {self.sql(expression.expression)} FROM {self.sql(expression, 'source')}"
+        pass
 
     def projectiondef_sql(self, expression: exp.ProjectionDef) -> str:
-        return f"PROJECTION {self.sql(expression.this)} {self.wrap(expression.expression)}"
+        pass
 
     def nestedjsonselect_sql(self, expression: exp.NestedJSONSelect) -> str:
-        return f"{self.sql(expression, 'this')}.^{self.sql(expression, 'expression')}"
+        pass
 
     def is_sql(self, expression: exp.Is) -> str:
-        is_sql = super().is_sql(expression)
-
-        if isinstance(expression.parent, exp.Not):
-            # value IS NOT NULL -> NOT (value IS NULL)
-            is_sql = self.wrap(is_sql)
-
-        return is_sql
+        pass
 
     def in_sql(self, expression: exp.In) -> str:
-        in_sql = super().in_sql(expression)
-
-        if isinstance(expression.parent, exp.Not) and expression.args.get("is_global"):
-            in_sql = in_sql.replace("GLOBAL IN", "GLOBAL NOT IN", 1)
-
-        return in_sql
+        pass
 
     def not_sql(self, expression: exp.Not) -> str:
-        if isinstance(expression.this, exp.In):
-            if expression.this.args.get("is_global"):
-                # let `GLOBAL IN` child interpose `NOT`
-                return self.sql(expression, "this")
-
-            expression.set("this", exp.paren(expression.this, copy=False))
-
-        return super().not_sql(expression)
+        pass
 
     def values_sql(self, expression: exp.Values, values_as_table: bool = True) -> str:
         # If the VALUES clause contains tuples of expressions, we need to treat it
         # as a table since Clickhouse will automatically alias it as such.
-        alias = expression.args.get("alias")
-
-        if alias and alias.args.get("columns") and expression.expressions:
-            values = expression.expressions[0].expressions
-            values_as_table = any(isinstance(value, exp.Tuple) for value in values)
-        else:
-            values_as_table = True
-
-        return super().values_sql(expression, values_as_table=values_as_table)
+        pass
 
     def timestamptrunc_sql(self, expression: exp.TimestampTrunc) -> str:
         unit = unit_to_str(expression)

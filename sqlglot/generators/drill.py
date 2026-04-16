@@ -15,13 +15,7 @@ from sqlglot.generator import unsupported_args
 
 
 def _str_to_date(self: DrillGenerator, expression: exp.StrToDate) -> str:
-    from sqlglot.dialects.drill import Drill
-
-    this = self.sql(expression, "this")
-    time_format = self.format_time(expression)
-    if time_format == Drill.DATE_FORMAT:
-        return self.sql(exp.cast(this, exp.DType.DATE))
-    return self.func("TO_DATE", this, time_format)
+    pass
 
 
 class DrillGenerator(generator.Generator):

@@ -114,136 +114,40 @@ def _build_formatted_time(
     exp_class: type[E], full_format_mapping: bool | None = None
 ) -> t.Callable[[list], E]:
     def _builder(args: list) -> E:
-        fmt = seq_get(args, 0)
-        if isinstance(fmt, exp.Expr):
-            from sqlglot.dialects.tsql import TSQL
-
-            fmt = exp.Literal.string(
-                format_time(
-                    fmt.name.lower(),
-                    (
-                        {**TSQL.TIME_MAPPING, **FULL_FORMAT_TIME_MAPPING}
-                        if full_format_mapping
-                        else TSQL.TIME_MAPPING
-                    ),
-                )
-            )
-
-        this = seq_get(args, 1)
-        if isinstance(this, exp.Expr):
-            this = exp.cast(this, exp.DType.DATETIME2)
-
-        return exp_class(this=this, format=fmt)
+        pass
 
     return _builder
 
 
 def _build_format(args: list) -> exp.NumberToStr | exp.TimeToStr:
-    this = seq_get(args, 0)
-    fmt = seq_get(args, 1)
-    culture = seq_get(args, 2)
-
-    number_fmt = fmt and (fmt.name in TRANSPILE_SAFE_NUMBER_FMT or not DATE_FMT_RE.search(fmt.name))
-
-    if number_fmt:
-        return exp.NumberToStr(this=this, format=fmt, culture=culture)
-
-    if fmt:
-        from sqlglot.dialects.tsql import TSQL
-
-        fmt = exp.Literal.string(
-            format_time(fmt.name, TSQL.FORMAT_TIME_MAPPING)
-            if len(fmt.name) == 1
-            else format_time(fmt.name, TSQL.TIME_MAPPING)
-        )
-
-    return exp.TimeToStr(this=this, format=fmt, culture=culture)
+    pass
 
 
 def _build_eomonth(args: list) -> exp.LastDay:
-    date = exp.TsOrDsToDate(this=seq_get(args, 0))
-    month_lag = seq_get(args, 1)
-
-    if month_lag is None:
-        this: exp.Expr = date
-    else:
-        unit = DATE_DELTA_INTERVAL.get("month")
-        this = exp.DateAdd(this=date, expression=month_lag, unit=unit and exp.var(unit))
-
-    return exp.LastDay(this=this)
+    pass
 
 
 def _build_hashbytes(args: list) -> exp.Expr:
-    kind, data = args
-    kind = kind.name.upper() if kind.is_string else ""
-
-    if kind == "MD5":
-        args.pop(0)
-        return exp.MD5(this=data)
-    if kind in ("SHA", "SHA1"):
-        args.pop(0)
-        return exp.SHA(this=data)
-    if kind == "SHA2_256":
-        return exp.SHA2(this=data, length=exp.Literal.number(256))
-    if kind == "SHA2_512":
-        return exp.SHA2(this=data, length=exp.Literal.number(512))
-
-    return exp.func("HASHBYTES", *args)
+    pass
 
 
 def _build_date_delta(
     exp_class: type[E], unit_mapping: dict[str, str] | None = None, big_int: bool = False
 ) -> t.Callable[[list], E]:
     def _builder(args: list) -> E:
-        unit = seq_get(args, 0)
-        if unit and unit_mapping:
-            unit = exp.var(unit_mapping.get(unit.name.lower(), unit.name))
-
-        start_date = seq_get(args, 1)
-        if start_date and start_date.is_number:
-            # Numeric types are valid DATETIME values
-            if start_date.is_int:
-                adds = DEFAULT_START_DATE + datetime.timedelta(days=start_date.to_py())
-                start_date = exp.Literal.string(adds.strftime("%F"))
-            else:
-                # We currently don't handle float values, i.e. they're not converted to equivalent DATETIMEs.
-                # This is not a problem when generating T-SQL code, it is when transpiling to other dialects.
-                return exp_class(
-                    this=seq_get(args, 2), expression=start_date, unit=unit, big_int=big_int
-                )
-
-        return exp_class(
-            this=exp.TimeStrToTime(this=seq_get(args, 2)),
-            expression=exp.TimeStrToTime(this=start_date),
-            unit=unit,
-            big_int=big_int,
-        )
+        pass
 
     return _builder
 
 
 # https://learn.microsoft.com/en-us/sql/t-sql/functions/datetimefromparts-transact-sql?view=sql-server-ver16#syntax
 def _build_datetimefromparts(args: list) -> exp.TimestampFromParts:
-    return exp.TimestampFromParts(
-        year=seq_get(args, 0),
-        month=seq_get(args, 1),
-        day=seq_get(args, 2),
-        hour=seq_get(args, 3),
-        min=seq_get(args, 4),
-        sec=seq_get(args, 5),
-        milli=seq_get(args, 6),
-    )
+    pass
 
 
 # https://learn.microsoft.com/en-us/sql/t-sql/functions/timefromparts-transact-sql?view=sql-server-ver16#syntax
 def _build_timefromparts(args: list) -> exp.TimeFromParts:
-    return exp.TimeFromParts(
-        hour=seq_get(args, 0),
-        min=seq_get(args, 1),
-        sec=seq_get(args, 2),
-        fractions=seq_get(args, 3),
-        precision=seq_get(args, 4),
-    )
+    pass
 
 
 def _build_with_arg_as_text(
@@ -271,37 +175,15 @@ def _build_parsename(args: list) -> exp.SplitPart | exp.Anonymous:
     # PARSENAME(...) will be stored into exp.SplitPart if:
     # - All args are literals
     # - The part index (2nd arg) is <= 4 (max valid value, otherwise TSQL returns NULL)
-    if len(args) == 2 and all(isinstance(arg, exp.Literal) for arg in args):
-        this = args[0]
-        part_index = args[1]
-        split_count = len(this.name.split("."))
-        if split_count <= 4:
-            return exp.SplitPart(
-                this=this,
-                delimiter=exp.Literal.string("."),
-                part_index=exp.Literal.number(split_count + 1 - part_index.to_py()),
-            )
-
-    return exp.Anonymous(this="PARSENAME", expressions=args)
+    pass
 
 
 def _build_json_query(args: list, dialect: Dialect) -> exp.JSONExtract:
-    if len(args) == 1:
-        # The default value for path is '$'. As a result, if you don't provide a
-        # value for path, JSON_QUERY returns the input expression.
-        args.append(exp.Literal.string("$"))
-
-    return parser.build_extract_json_with_path(exp.JSONExtract)(args, dialect)
+    pass
 
 
 def _build_datetrunc(args: list) -> exp.TimestampTrunc:
-    unit = seq_get(args, 0)
-    this = seq_get(args, 1)
-
-    if this and this.is_string:
-        this = exp.cast(this, exp.DType.DATETIME2)
-
-    return exp.TimestampTrunc(this=this, unit=unit)
+    pass
 
 
 class TSQLParser(parser.Parser):
@@ -481,14 +363,7 @@ class TSQLParser(parser.Parser):
             return None
 
         def _parse_option() -> exp.Expr | None:
-            option = self._parse_var_from_options(OPTIONS)
-            if not option:
-                return None
-
-            self._match(TokenType.EQ)
-            return self.expression(
-                exp.QueryOption(this=option, expression=self._parse_primary_or_var())
-            )
+            pass
 
         return self._parse_wrapped_csv(_parse_option)
 
@@ -506,12 +381,7 @@ class TSQLParser(parser.Parser):
             return None
 
         def _parse_for_xml() -> exp.Expr | None:
-            return self.expression(
-                exp.QueryOption(
-                    this=self._parse_var_from_options(XML_OPTIONS, raise_unmatched=False)
-                    or self._parse_xml_key_value_option()
-                )
-            )
+            pass
 
         return self._parse_csv(_parse_for_xml)
 
@@ -700,10 +570,7 @@ class TSQLParser(parser.Parser):
             return None
 
         def parse_range():
-            low = self._parse_bitwise()
-            high = self._parse_bitwise() if self._match_text_seq("TO") else None
-
-            return self.expression(exp.PartitionRange(this=low, expression=high)) if high else low
+            pass
 
         partition = self.expression(exp.Partition(expressions=self._parse_wrapped_csv(parse_range)))
 
@@ -723,4 +590,4 @@ class TSQLParser(parser.Parser):
         return expression
 
     def _parse_primary_key_part(self) -> exp.Expr | None:
-        return self._parse_ordered()
+        pass

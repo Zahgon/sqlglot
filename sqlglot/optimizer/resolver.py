@@ -86,11 +86,7 @@ class Resolver:
     @property
     def all_columns(self) -> set[str]:
         """All available columns of all sources in this scope"""
-        if self._all_columns is None:
-            self._all_columns = {
-                column for columns in self._get_all_source_columns().values() for column in columns
-            }
-        return self._all_columns
+        pass
 
     def get_source_columns_from_set_op(self, expression: exp.Expr) -> list[str]:
         if isinstance(expression, exp.Select):

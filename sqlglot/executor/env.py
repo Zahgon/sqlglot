@@ -23,10 +23,7 @@ class reverse_key:
 def filter_nulls(func, empty_null=True):
     @wraps(func)
     def _func(values):
-        filtered = tuple(v for v in values if v is not None)
-        if not filtered and empty_null:
-            return None
-        return func(filtered)
+        pass
 
     return _func
 
@@ -63,9 +60,7 @@ def null_if_any(*required):
 
         @wraps(func)
         def _func(*args):
-            if predicate(*args):
-                return None
-            return func(*args)
+            pass
 
         return _func
 
@@ -77,24 +72,12 @@ def null_if_any(*required):
 
 @null_if_any("this", "substr")
 def str_position(this, substr, position=None):
-    position = position - 1 if position is not None else position
-    return this.find(substr, position) + 1
+    pass
 
 
 @null_if_any("this")
 def substring(this, start=None, length=None):
-    if start is None:
-        return this
-    elif start == 0:
-        return ""
-    elif start < 0:
-        start = len(this) + start
-    else:
-        start -= 1
-
-    end = None if length is None else start + length
-
-    return this[start:end]
+    pass
 
 
 @null_if_any
@@ -132,9 +115,7 @@ def cast(this, to):
 
 
 def ordered(this, desc, nulls_first):
-    if desc:
-        return reverse_key(this)
-    return this
+    pass
 
 
 @null_if_any
@@ -147,23 +128,12 @@ def interval(this, unit):
 
 @null_if_any("this", "expression")
 def arraytostring(this, expression, null=None):
-    return expression.join(x for x in (x if x is not None else null for x in this) if x is not None)
+    pass
 
 
 @null_if_any("this", "expression")
 def jsonextract(this, expression):
-    for path_segment in expression:
-        if isinstance(this, dict):
-            this = this.get(path_segment)
-        elif isinstance(this, list) and is_int(path_segment):
-            this = seq_get(this, int(path_segment))
-        else:
-            raise NotImplementedError(f"Unable to extract value for {this} at {path_segment}.")
-
-        if this is None:
-            break
-
-    return this
+    pass
 
 
 ENV = {

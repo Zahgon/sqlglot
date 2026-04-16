@@ -47,7 +47,7 @@ class AutoName(Enum):
     """
 
     def _generate_next_value_(name, _start, _count, _last_values):
-        return name
+        pass
 
 
 def suggest_closest_match_and_fail(
@@ -246,7 +246,7 @@ def is_int(text: str) -> bool:
 
 
 def is_float(text: str) -> bool:
-    return is_type(text, float)
+    pass
 
 
 def is_type(text: str, target_type: Type) -> bool:
@@ -265,10 +265,7 @@ def name_sequence(prefix: str) -> t.Callable[[], str]:
 
 def object_to_dict(obj: t.Any, **kwargs) -> dict:
     """Returns a dictionary created from an object's attributes."""
-    return {
-        **{k: v.copy() if hasattr(v, "copy") else copy(v) for k, v in vars(obj).items()},
-        **kwargs,
-    }
+    pass
 
 
 def split_num_words(

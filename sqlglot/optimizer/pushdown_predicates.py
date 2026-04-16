@@ -229,8 +229,6 @@ def replace_aliases(source, predicate):
             aliases[select.name] = select
 
     def _replace_alias(column):
-        if isinstance(column, exp.Column) and column.name in aliases:
-            return aliases[column.name].copy()
-        return column
+        pass
 
     return predicate.transform(_replace_alias)

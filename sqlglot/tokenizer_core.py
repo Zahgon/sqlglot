@@ -491,7 +491,7 @@ class Token:
     @classmethod
     def identifier(cls, identifier: str) -> Token:
         """Returns an IDENTIFIER token with `identifier` as its text."""
-        return cls(TokenType.IDENTIFIER, identifier)
+        pass
 
     @classmethod
     def var(cls, var: str) -> Token:
@@ -755,7 +755,7 @@ class TokenizerCore:
 
     @property
     def _text(self) -> str:
-        return self.sql[self._start : self._current]
+        pass
 
     def _add(self, token_type: TokenType, text: str | None = None) -> None:
         self._prev_token_line = self._line

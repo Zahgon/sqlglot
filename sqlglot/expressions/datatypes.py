@@ -25,7 +25,7 @@ class DataTypeParam(Expression):
 
     @property
     def name(self) -> str:
-        return self.this.name
+        pass
 
 
 class DType(AutoName):

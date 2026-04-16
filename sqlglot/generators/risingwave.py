@@ -22,11 +22,7 @@ class RisingWaveGenerator(PostgresGenerator):
     EXPRESSION_PRECEDES_PROPERTIES_CREATABLES = {"SINK"}
 
     def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
-        return Generator.computedcolumnconstraint_sql(self, expression)
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
-        if expression.is_type(exp.DType.MAP) and len(expression.expressions) == 2:
-            key_type, value_type = expression.expressions
-            return f"MAP({self.sql(key_type)}, {self.sql(value_type)})"
-
-        return super().datatype_sql(expression)
+        pass

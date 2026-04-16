@@ -21,7 +21,7 @@ from sqlglot.generators.mysql import MySQLGenerator, _remove_ts_or_ds_to_date, d
 
 
 def _unicode_substitute(m: re.Match[str]) -> str:
-    return chr(int(m.group(1), 16))
+    pass
 
 
 class SingleStoreGenerator(MySQLGenerator):
@@ -1419,177 +1419,51 @@ class SingleStoreGenerator(MySQLGenerator):
     }
 
     def jsonextractscalar_sql(self, expression: exp.JSONExtractScalar) -> str:
-        json_type = expression.args.get("json_type")
-        func_name = "JSON_EXTRACT_JSON" if json_type is None else f"JSON_EXTRACT_{json_type}"
-        return json_extract_segments(func_name)(self, expression)
+        pass
 
     def jsonbextractscalar_sql(self, expression: exp.JSONBExtractScalar) -> str:
-        json_type = expression.args.get("json_type")
-        func_name = "BSON_EXTRACT_BSON" if json_type is None else f"BSON_EXTRACT_{json_type}"
-        return json_extract_segments(func_name)(self, expression)
+        pass
 
     def jsonextractarray_sql(self, expression: exp.JSONExtractArray) -> str:
-        self.unsupported("Arrays are not supported in SingleStore")
-        return self.function_fallback_sql(expression)
+        pass
 
     def jsonvalue_sql(self, expression: exp.JSONValue) -> str:
-        if expression.args.get("on_condition"):
-            self.unsupported("JSON_VALUE does not support on_condition")
-        res: exp.Expr = exp.JSONExtractScalar(
-            this=expression.this,
-            expression=expression.args.get("path"),
-            json_type="STRING",
-        )
-
-        returning = expression.args.get("returning")
-        if returning is not None:
-            res = exp.Cast(this=res, to=returning)
-
-        return self.sql(res)
+        pass
 
     def all_sql(self, expression: exp.All) -> str:
-        self.unsupported("ALL subquery predicate is not supported in SingleStore")
-        return super().all_sql(expression)
+        pass
 
     def jsonarraycontains_sql(self, expression: exp.JSONArrayContains) -> str:
-        json_type = expression.text("json_type").upper()
-
-        if json_type:
-            return self.func(
-                f"JSON_ARRAY_CONTAINS_{json_type}", expression.expression, expression.this
-            )
-
-        return self.func(
-            "JSON_ARRAY_CONTAINS_JSON",
-            expression.expression,
-            self.func("TO_JSON", expression.this),
-        )
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
-        for arg_name in ("kind", "values"):
-            if expression.args.get(arg_name):
-                self.unsupported(f"DATATYPE does not support {arg_name}")
-        if expression.args.get("nested") and not expression.is_type(exp.DType.STRUCT):
-            self.unsupported(
-                f"Argument 'nested' is not supported for representation of '{expression.this.value}' in SingleStore"
-            )
-
-        if expression.is_type(exp.DType.VARBINARY) and not expression.expressions:
-            # `VARBINARY` must always have a size - if it doesn't, we always generate `BLOB`
-            return "BLOB"
-        if expression.is_type(
-            exp.DType.DECIMAL32,
-            exp.DType.DECIMAL64,
-            exp.DType.DECIMAL128,
-            exp.DType.DECIMAL256,
-        ):
-            scale = self.expressions(expression, flat=True)
-
-            if expression.is_type(exp.DType.DECIMAL32):
-                precision = "9"
-            elif expression.is_type(exp.DType.DECIMAL64):
-                precision = "18"
-            elif expression.is_type(exp.DType.DECIMAL128):
-                precision = "38"
-            else:
-                # 65 is a maximum precision supported in SingleStore
-                precision = "65"
-            if scale is not None:
-                return f"DECIMAL({precision}, {scale[0]})"
-            else:
-                return f"DECIMAL({precision})"
-        if expression.is_type(exp.DType.VECTOR):
-            expressions = expression.expressions
-            if len(expressions) == 2:
-                type_name = self.sql(expressions[0])
-                if type_name in self.dialect.INVERSE_VECTOR_TYPE_ALIASES:
-                    type_name = self.dialect.INVERSE_VECTOR_TYPE_ALIASES[type_name]
-
-                return f"VECTOR({self.sql(expressions[1])}, {type_name})"
-
-        return super().datatype_sql(expression)
+        pass
 
     def collate_sql(self, expression: exp.Collate) -> str:
         # SingleStore does not support setting a collation for column in the SELECT query,
         # so we cast column to a LONGTEXT type with specific collation
-        return self.binary(expression, ":> LONGTEXT COLLATE")
+        pass
 
     def currentdate_sql(self, expression: exp.CurrentDate) -> str:
-        timezone = expression.this
-        if timezone:
-            if isinstance(timezone, exp.Literal) and timezone.name.lower() == "utc":
-                return self.func("UTC_DATE")
-            self.unsupported("CurrentDate with timezone is not supported in SingleStore")
-
-        return self.func("CURRENT_DATE")
+        pass
 
     def currenttime_sql(self, expression: exp.CurrentTime) -> str:
-        arg = expression.this
-        if arg:
-            if isinstance(arg, exp.Literal) and arg.name.lower() == "utc":
-                return self.func("UTC_TIME")
-            if isinstance(arg, exp.Literal) and arg.is_number:
-                return self.func("CURRENT_TIME", arg)
-            self.unsupported("CurrentTime with timezone is not supported in SingleStore")
-
-        return self.func("CURRENT_TIME")
+        pass
 
     def currenttimestamp_sql(self, expression: exp.CurrentTimestamp) -> str:
-        arg = expression.this
-        if arg:
-            if isinstance(arg, exp.Literal) and arg.name.lower() == "utc":
-                return self.func("UTC_TIMESTAMP")
-            if isinstance(arg, exp.Literal) and arg.is_number:
-                return self.func("CURRENT_TIMESTAMP", arg)
-            self.unsupported("CurrentTimestamp with timezone is not supported in SingleStore")
-
-        return self.func("CURRENT_TIMESTAMP")
+        pass
 
     def standardhash_sql(self, expression: exp.StandardHash) -> str:
-        hash_function = expression.expression
-        if hash_function is None:
-            return self.func("SHA", expression.this)
-        if isinstance(hash_function, exp.Literal):
-            if hash_function.name.lower() == "sha":
-                return self.func("SHA", expression.this)
-            if hash_function.name.lower() == "md5":
-                return self.func("MD5", expression.this)
-
-            self.unsupported(f"{hash_function.this} hash method is not supported in SingleStore")
-            return self.func("SHA", expression.this)
-
-        self.unsupported("STANDARD_HASH function is not supported in SingleStore")
-        return self.func("SHA", expression.this)
+        pass
 
     def truncatetable_sql(self, expression: exp.TruncateTable) -> str:
-        for arg_name in ("is_database", "exists", "cluster", "identity", "option", "partition"):
-            if expression.args.get(arg_name):
-                self.unsupported(f"TRUNCATE TABLE does not support {arg_name}")
-        statements = []
-        for table in expression.expressions:
-            statements.append(f"TRUNCATE {self.sql(table)}")
-
-        return "; ".join(statements)
+        pass
 
     def renamecolumn_sql(self, expression: exp.RenameColumn) -> str:
-        if expression.args.get("exists"):
-            self.unsupported("RENAME COLUMN does not support exists")
-        old_column = self.sql(expression, "this")
-        new_column = self.sql(expression, "to")
-        return f"CHANGE {old_column} {new_column}"
+        pass
 
     def altercolumn_sql(self, expression: exp.AlterColumn) -> str:
-        for arg_name in ("drop", "comment", "allow_null", "visible", "using"):
-            if expression.args.get(arg_name):
-                self.unsupported(f"ALTER COLUMN does not support {arg_name}")
-        alter = super().altercolumn_sql(expression)
-
-        collate = self.sql(expression, "collate")
-        collate = f" COLLATE {collate}" if collate else ""
-        return f"{alter}{collate}"
+        pass
 
     def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
-        this = self.sql(expression, "this")
-        not_null = " NOT NULL" if expression.args.get("not_null") else ""
-        type = self.sql(expression, "data_type") or "AUTO"
-        return f"AS {this} PERSISTED {type}{not_null}"
+        pass

@@ -13,9 +13,7 @@ from sqlglot.generators.spark import SparkGenerator
 def _jsonextract_sql(
     self: DatabricksGenerator, expression: exp.JSONExtract | exp.JSONExtractScalar
 ) -> str:
-    this = self.sql(expression, "this")
-    expr = self.sql(expression, "expression")
-    return f"{this}:{expr}"
+    pass
 
 
 class DatabricksGenerator(SparkGenerator):
@@ -73,39 +71,13 @@ class DatabricksGenerator(SparkGenerator):
     }
 
     def create_sql(self, expression: exp.Create) -> str:
-        body = expression.expression
-        if (
-            body
-            and not isinstance(body, exp.Return)
-            and expression.kind == "FUNCTION"
-            and any(p.args.get("is_table") for p in expression.find_all(exp.ReturnsProperty))
-        ):
-            expression.set("expression", exp.Return(this=body))
-        return super().create_sql(expression)
+        pass
 
     def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
-        constraint = expression.find(exp.GeneratedAsIdentityColumnConstraint)
-        kind = expression.kind
-        if (
-            constraint
-            and isinstance(kind, exp.DataType)
-            and kind.this in exp.DataType.INTEGER_TYPES
-        ):
-            # only BIGINT generated identity constraints are supported
-            expression.set("kind", exp.DType.BIGINT.into_expr())
-
-        return super().columndef_sql(expression, sep)
+        pass
 
     def jsonpath_sql(self, expression: exp.JSONPath) -> str:
-        expression.set("escape", None)
-        return super().jsonpath_sql(expression)
+        pass
 
     def uniform_sql(self, expression: exp.Uniform) -> str:
-        gen = expression.args.get("gen")
-        seed = expression.args.get("seed")
-
-        # From Snowflake UNIFORM(min, max, gen) as RANDOM(), RANDOM(seed), or constant value -> Extract seed
-        if gen:
-            seed = gen.this
-
-        return self.func("UNIFORM", expression.this, expression.expression, seed)
+        pass

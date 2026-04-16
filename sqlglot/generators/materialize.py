@@ -30,27 +30,13 @@ class MaterializeGenerator(PostgresGenerator):
     }
 
     def propertyeq_sql(self, expression: exp.PropertyEQ) -> str:
-        return self.binary(expression, "=>")
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
-        if expression.is_type(exp.DType.LIST):
-            if expression.expressions:
-                return f"{self.expressions(expression, flat=True)} LIST"
-            return "LIST"
-
-        if expression.is_type(exp.DType.MAP) and len(expression.expressions) == 2:
-            key, value = expression.expressions
-            return f"MAP[{self.sql(key)} => {self.sql(value)}]"
-
-        return super().datatype_sql(expression)
+        pass
 
     def list_sql(self, expression: exp.List) -> str:
-        if isinstance(seq_get(expression.expressions, 0), exp.Select):
-            return self.func("LIST", seq_get(expression.expressions, 0))
-
-        return f"{self.normalize_func('LIST')}[{self.expressions(expression, flat=True)}]"
+        pass
 
     def tomap_sql(self, expression: exp.ToMap) -> str:
-        if isinstance(expression.this, exp.Select):
-            return self.func("MAP", expression.this)
-        return f"{self.normalize_func('MAP')}[{self.expressions(expression.this)}]"
+        pass

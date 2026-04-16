@@ -19,14 +19,7 @@ DATE_DELTA = t.Union[exp.DateAdd, exp.DateSub]
 
 
 def to_char_is_numeric_handler(args: list, dialect: DialectType) -> exp.TimeToStr | exp.ToChar:
-    expression = build_timetostr_or_tochar(args, dialect)
-    fmt = seq_get(args, 1)
-
-    if fmt and isinstance(expression, exp.ToChar) and fmt.is_string and "#" in fmt.name:
-        # Only mark as numeric if format is a literal containing #
-        expression.set("is_numeric", True)
-
-    return expression
+    pass
 
 
 def build_date_delta_with_cast_interval(
@@ -35,51 +28,13 @@ def build_date_delta_with_cast_interval(
     fallback_builder = build_date_delta(expression_class)
 
     def _builder(args):
-        if len(args) == 2:
-            date_arg, interval_arg = args
-
-            if (
-                isinstance(interval_arg, exp.Cast)
-                and isinstance(interval_arg.to, exp.DataType)
-                and isinstance(interval_arg.to.this, exp.Interval)
-            ):
-                return expression_class(
-                    this=date_arg,
-                    expression=interval_arg.this,
-                    unit=interval_arg.to.this.unit,
-                )
-
-            return expression_class(this=date_arg, expression=interval_arg)
-
-        return fallback_builder(args)
+        pass
 
     return _builder
 
 
 def datetype_handler(args: list[exp.Expr], dialect: DialectType) -> exp.Expr:
-    from sqlglot.dialects.dialect import Dialect
-
-    year, month, day = args
-
-    if all(isinstance(arg, exp.Literal) and arg.is_int for arg in (year, month, day)):
-        date_str = f"{int(year.this):04d}-{int(month.this):02d}-{int(day.this):02d}"
-        return exp.Date(this=exp.Literal.string(date_str))
-
-    dialect = Dialect.get_or_raise(dialect)
-
-    return exp.Cast(
-        this=exp.Concat(
-            expressions=[
-                year,
-                exp.Literal.string("-"),
-                month,
-                exp.Literal.string("-"),
-                day,
-            ],
-            coalesce=dialect.CONCAT_COALESCE,
-        ),
-        to=exp.DType.DATE.into_expr(),
-    )
+    pass
 
 
 class DremioParser(parser.Parser):

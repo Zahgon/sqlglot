@@ -52,9 +52,7 @@ class Oracle(Dialect):
     def can_quote(self, identifier: exp.Identifier, identify: str | bool = "safe") -> bool:
         # Disable quoting for pseudocolumns as it may break queries e.g
         # `WHERE "ROWNUM" = ...` does not work but `WHERE ROWNUM = ...` does
-        return (
-            identifier.quoted or not isinstance(identifier.parent, exp.Pseudocolumn)
-        ) and super().can_quote(identifier, identify=identify)
+        pass
 
     class Tokenizer(tokens.Tokenizer):
         VAR_SINGLE_TOKENS = {"@", "$", "#"}

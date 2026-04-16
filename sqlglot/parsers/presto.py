@@ -14,42 +14,15 @@ from sqlglot.tokens import TokenType
 
 
 def _build_approx_percentile(args: list) -> exp.Expr:
-    if len(args) == 4:
-        return exp.ApproxQuantile(
-            this=seq_get(args, 0),
-            weight=seq_get(args, 1),
-            quantile=seq_get(args, 2),
-            accuracy=seq_get(args, 3),
-        )
-    if len(args) == 3:
-        return exp.ApproxQuantile(
-            this=seq_get(args, 0), quantile=seq_get(args, 1), accuracy=seq_get(args, 2)
-        )
-    return exp.ApproxQuantile.from_arg_list(args)
+    pass
 
 
 def _build_from_unixtime(args: list) -> exp.Expr:
-    if len(args) == 3:
-        return exp.UnixToTime(
-            this=seq_get(args, 0),
-            hours=seq_get(args, 1),
-            minutes=seq_get(args, 2),
-        )
-    if len(args) == 2:
-        return exp.UnixToTime(this=seq_get(args, 0), zone=seq_get(args, 1))
-
-    return exp.UnixToTime.from_arg_list(args)
+    pass
 
 
 def _build_to_char(args: list) -> exp.TimeToStr:
-    fmt = seq_get(args, 1)
-    if isinstance(fmt, exp.Literal):
-        # We uppercase this to match Teradata's format mapping keys
-        fmt.set("this", fmt.this.upper())
-
-    # We use "teradata" on purpose here, because the time formats are different in Presto.
-    # See https://prestodb.io/docs/current/functions/teradata.html?highlight=to_char#to_char
-    return build_formatted_time(exp.TimeToStr, "teradata")(args)
+    pass
 
 
 class PrestoParser(parser.Parser):

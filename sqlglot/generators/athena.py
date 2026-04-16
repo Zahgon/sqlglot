@@ -8,11 +8,7 @@ from sqlglot.generators.trino import TrinoGenerator
 
 
 def _is_iceberg_table(properties: exp.Properties) -> bool:
-    for p in properties.expressions:
-        if isinstance(p, exp.Property) and p.name == "table_type":
-            return p.text("value").lower() == "iceberg"
-
-    return False
+    pass
 
 
 def _location_property_sql(self: AthenaTrinoGenerator, e: exp.LocationProperty) -> str:
@@ -20,13 +16,7 @@ def _location_property_sql(self: AthenaTrinoGenerator, e: exp.LocationProperty) 
     # Otherwise, it's called 'external_location'
     # ref: https://docs.aws.amazon.com/athena/latest/ug/create-table-as.html
 
-    prop_name = "external_location"
-
-    if isinstance(e.parent, exp.Properties):
-        if _is_iceberg_table(e.parent):
-            prop_name = "location"
-
-    return f"{prop_name}={self.sql(e, 'this')}"
+    pass
 
 
 def _partitioned_by_property_sql(self: AthenaTrinoGenerator, e: exp.PartitionedByProperty) -> str:
@@ -34,13 +24,7 @@ def _partitioned_by_property_sql(self: AthenaTrinoGenerator, e: exp.PartitionedB
     # If table_type='hive' it's called 'partitioned_by'
     # ref: https://docs.aws.amazon.com/athena/latest/ug/create-table-as.html#ctas-table-properties
 
-    prop_name = "partitioned_by"
-
-    if isinstance(e.parent, exp.Properties):
-        if _is_iceberg_table(e.parent):
-            prop_name = "partitioning"
-
-    return f"{prop_name}={self.sql(e, 'this')}"
+    pass
 
 
 def _generate_as_hive(expression: exp.Expr) -> bool:
@@ -82,31 +66,12 @@ def _generator_kwargs(
     max_text_width: int,
     comments: bool,
 ) -> dict[str, t.Any]:
-    kwargs: dict[str, t.Any] = {
-        "pretty": pretty,
-        "identify": identify,
-        "normalize": normalize,
-        "pad": pad,
-        "indent": indent,
-        "normalize_functions": normalize_functions,
-        "max_unsupported": max_unsupported,
-        "leading_comma": leading_comma,
-        "max_text_width": max_text_width,
-        "comments": comments,
-    }
-    if unsupported_level is not None:
-        kwargs["unsupported_level"] = unsupported_level
-    return kwargs
+    pass
 
 
 class _HiveGenerator(HiveGenerator):
     def alter_sql(self, expression: exp.Alter) -> str:
-        if isinstance(expression, exp.Alter) and expression.kind == "TABLE":
-            if expression.actions and isinstance(expression.actions[0], exp.ColumnDef):
-                new_actions = exp.Schema(expressions=expression.actions)
-                expression.set("actions", [new_actions])
-
-        return super().alter_sql(expression)
+        pass
 
 
 class AthenaTrinoGenerator(TrinoGenerator):

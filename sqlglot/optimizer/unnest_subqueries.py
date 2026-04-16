@@ -260,11 +260,7 @@ def decorrelate(select, parent_select, external_columns, next_alias_name):
         if value.find(exp.Count):
 
             def remove_aggs(node):
-                if isinstance(node, exp.Count):
-                    return exp.Literal.number(0)
-                elif isinstance(node, exp.AggFunc):
-                    return exp.null()
-                return node
+                pass
 
             alias = exp.Coalesce(this=alias, expressions=[value.this.transform(remove_aggs)])
 

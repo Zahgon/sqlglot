@@ -41,34 +41,15 @@ if t.TYPE_CHECKING:
 
 
 def _build_datediff(args: list) -> exp.DateDiff:
-    return exp.DateDiff(
-        this=seq_get(args, 2),
-        expression=seq_get(args, 1),
-        unit=map_date_part(seq_get(args, 0)),
-        date_part_boundary=True,
-    )
+    pass
 
 
 def _build_date_time_add(expr_type: type[E]) -> t.Callable[[list], E]:
-    def _builder(args: list) -> E:
-        return expr_type(
-            this=seq_get(args, 2),
-            expression=seq_get(args, 1),
-            unit=map_date_part(seq_get(args, 0)),
-        )
-
-    return _builder
+    pass
 
 
 def _regexpilike_sql(self: SnowflakeGenerator, expression: exp.RegexpILike) -> str:
-    flag = expression.text("flag")
-
-    if "i" not in flag:
-        flag += "i"
-
-    return self.func(
-        "REGEXP_LIKE", expression.this, expression.expression, exp.Literal.string(flag)
-    )
+    pass
 
 
 def _unqualify_pivot_columns(expression: exp.Expr) -> exp.Expr:
@@ -82,121 +63,19 @@ def _unqualify_pivot_columns(expression: exp.Expr) -> exp.Expr:
         >>> print(_unqualify_pivot_columns(expr).sql(dialect="snowflake"))
         SELECT * FROM m_sales UNPIVOT(sales FOR month IN (jan, feb, mar, april))
     """
-    if isinstance(expression, exp.Pivot):
-        if expression.unpivot:
-            expression = transforms.unqualify_columns(expression)
-        else:
-            for field in expression.fields:
-                field_expr = seq_get(field.expressions if field else [], 0)
-
-                if isinstance(field_expr, exp.PivotAny):
-                    unqualified_field_expr = transforms.unqualify_columns(field_expr)
-                    t.cast(exp.Expr, field).set("expressions", unqualified_field_expr, 0)
-
-    return expression
+    pass
 
 
 def _flatten_structured_types_unless_iceberg(expression: exp.Expr) -> exp.Expr:
-    assert isinstance(expression, exp.Create)
-
-    def _flatten_structured_type(expression: exp.Expr) -> exp.Expr:
-        if isinstance(expression, exp.DataType) and expression.this in exp.DataType.NESTED_TYPES:
-            expression.set("expressions", None)
-        return expression
-
-    props = expression.args.get("properties")
-    if isinstance(expression.this, exp.Schema) and not (props and props.find(exp.IcebergProperty)):
-        for schema_expression in expression.this.expressions:
-            if isinstance(schema_expression, exp.ColumnDef):
-                column_type = schema_expression.kind
-                if isinstance(column_type, exp.DataType):
-                    column_type.transform(_flatten_structured_type, copy=False)
-
-    return expression
+    pass
 
 
 def _unnest_generate_date_array(unnest: exp.Unnest) -> None:
-    generate_date_array = unnest.expressions[0]
-    start = generate_date_array.args.get("start")
-    end = generate_date_array.args.get("end")
-    step = generate_date_array.args.get("step")
-
-    if not start or not end or not isinstance(step, exp.Interval) or step.name != "1":
-        return
-
-    unit = step.args.get("unit")
-
-    unnest_alias = unnest.args.get("alias")
-    if unnest_alias:
-        unnest_alias = unnest_alias.copy()
-        sequence_value_name = seq_get(unnest_alias.columns, 0) or "value"
-    else:
-        sequence_value_name = "value"
-
-    # We'll add the next sequence value to the starting date and project the result
-    date_add = _build_date_time_add(exp.DateAdd)(
-        [unit, exp.cast(sequence_value_name, "int"), exp.cast(start, "date")]
-    )
-
-    # We use DATEDIFF to compute the number of sequence values needed
-    number_sequence = SnowflakeParser.FUNCTIONS["ARRAY_GENERATE_RANGE"](
-        [exp.Literal.number(0), _build_datediff([unit, start, end]) + 1]
-    )
-
-    unnest.set("expressions", [number_sequence])
-
-    unnest_parent = unnest.parent
-    if isinstance(unnest_parent, exp.Join):
-        select = unnest_parent.parent
-        if isinstance(select, exp.Select):
-            replace_column_name = (
-                sequence_value_name
-                if isinstance(sequence_value_name, str)
-                else sequence_value_name.name
-            )
-
-            scope = build_scope(select)
-            if scope:
-                for column in scope.columns:
-                    if column.name.lower() == replace_column_name.lower():
-                        column.replace(
-                            date_add.as_(replace_column_name)
-                            if isinstance(column.parent, exp.Select)
-                            else date_add
-                        )
-
-            lateral = exp.Lateral(this=unnest_parent.this.pop())
-            unnest_parent.replace(exp.Join(this=lateral))
-    else:
-        unnest.replace(
-            exp.select(date_add.as_(sequence_value_name))
-            .from_(unnest.copy())
-            .subquery(unnest_alias)
-        )
+    pass
 
 
 def _transform_generate_date_array(expression: exp.Expr) -> exp.Expr:
-    if isinstance(expression, exp.Select):
-        for generate_date_array in expression.find_all(exp.GenerateDateArray):
-            parent = generate_date_array.parent
-
-            # If GENERATE_DATE_ARRAY is used directly as an array (e.g passed into ARRAY_LENGTH), the transformed Snowflake
-            # query is the following (it'll be unnested properly on the next iteration due to copy):
-            # SELECT ref(GENERATE_DATE_ARRAY(...)) -> SELECT ref((SELECT ARRAY_AGG(*) FROM UNNEST(GENERATE_DATE_ARRAY(...))))
-            if not isinstance(parent, exp.Unnest):
-                unnest = exp.Unnest(expressions=[generate_date_array.copy()])
-                generate_date_array.replace(
-                    exp.select(exp.ArrayAgg(this=exp.Star())).from_(unnest).subquery()
-                )
-
-            if (
-                isinstance(parent, exp.Unnest)
-                and isinstance(parent.parent, (exp.From, exp.Join))
-                and len(parent.expressions) == 1
-            ):
-                _unnest_generate_date_array(parent)
-
-    return expression
+    pass
 
 
 def _regexpextract_sql(
@@ -204,172 +83,21 @@ def _regexpextract_sql(
 ) -> str:
     # Other dialects don't support all of the following parameters, so we need to
     # generate default values as necessary to ensure the transpilation is correct
-    group = expression.args.get("group")
-
-    # To avoid generating all these default values, we set group to None if
-    # it's 0 (also default value) which doesn't trigger the following chain
-    if group and group.name == "0":
-        group = None
-
-    parameters = expression.args.get("parameters") or (group and exp.Literal.string("c"))
-    occurrence = expression.args.get("occurrence") or (parameters and exp.Literal.number(1))
-    position = expression.args.get("position") or (occurrence and exp.Literal.number(1))
-
-    return self.func(
-        "REGEXP_SUBSTR" if isinstance(expression, exp.RegexpExtract) else "REGEXP_SUBSTR_ALL",
-        expression.this,
-        expression.expression,
-        position,
-        occurrence,
-        parameters,
-        group,
-    )
+    pass
 
 
 def _json_extract_value_array_sql(
     self: SnowflakeGenerator, expression: exp.JSONValueArray | exp.JSONExtractArray
 ) -> str:
-    json_extract = exp.JSONExtract(this=expression.this, expression=expression.expression)
-    ident = exp.to_identifier("x")
-
-    if isinstance(expression, exp.JSONValueArray):
-        this: exp.Expr = exp.cast(ident, to=exp.DType.VARCHAR)
-    else:
-        this = exp.ParseJSON(this=f"TO_JSON({ident})")
-
-    transform_lambda = exp.Lambda(expressions=[ident], this=this)
-
-    return self.func("TRANSFORM", json_extract, transform_lambda)
+    pass
 
 
 def _qualify_unnested_columns(expression: exp.Expr) -> exp.Expr:
-    if isinstance(expression, exp.Select):
-        scope = build_scope(expression)
-        if not scope:
-            return expression
-
-        unnests = list(scope.find_all(exp.Unnest))
-
-        if not unnests:
-            return expression
-
-        taken_source_names = set(scope.sources)
-        column_source: dict[str, exp.Identifier] = {}
-        unnest_to_identifier: dict[exp.Unnest, exp.Identifier] = {}
-
-        unnest_identifier: exp.Identifier | None = None
-        orig_expression = expression.copy()
-
-        for unnest in unnests:
-            if not isinstance(unnest.parent, (exp.From, exp.Join)):
-                continue
-
-            # Try to infer column names produced by an unnest operator. This is only possible
-            # when we can peek into the (statically known) contents of the unnested value.
-            unnest_columns: set[str] = set()
-            for unnest_expr in unnest.expressions:
-                if not isinstance(unnest_expr, exp.Array):
-                    continue
-
-                for array_expr in unnest_expr.expressions:
-                    if not (
-                        isinstance(array_expr, exp.Struct)
-                        and array_expr.expressions
-                        and all(
-                            isinstance(struct_expr, exp.PropertyEQ)
-                            for struct_expr in array_expr.expressions
-                        )
-                    ):
-                        continue
-
-                    unnest_columns.update(
-                        struct_expr.this.name.lower() for struct_expr in array_expr.expressions
-                    )
-                    break
-
-                if unnest_columns:
-                    break
-
-            unnest_alias = unnest.args.get("alias")
-            if not unnest_alias:
-                alias_name = find_new_name(taken_source_names, "value")
-                taken_source_names.add(alias_name)
-
-                # Produce a `TableAlias` AST similar to what is produced for BigQuery. This
-                # will be corrected later, when we generate SQL for the `Unnest` AST node.
-                aliased_unnest = exp.alias_(unnest, None, table=[alias_name])
-                scope.replace(unnest, aliased_unnest)
-
-                unnest_identifier = aliased_unnest.args["alias"].columns[0]
-            else:
-                alias_columns = getattr(unnest_alias, "columns", [])
-                unnest_identifier = unnest_alias.this or seq_get(alias_columns, 0)
-
-            if not isinstance(unnest_identifier, exp.Identifier):
-                return orig_expression
-
-            unnest_to_identifier[unnest] = unnest_identifier
-            column_source.update({c.lower(): unnest_identifier for c in unnest_columns})
-
-        for column in scope.columns:
-            if column.table:
-                continue
-
-            table = column_source.get(column.name.lower())
-            if (
-                unnest_identifier
-                and not table
-                and len(scope.sources) == 1
-                and column.name.lower() != unnest_identifier.name.lower()
-            ):
-                unnest_ancestor = column.find_ancestor(exp.Unnest, exp.Select)
-                if isinstance(unnest_ancestor, exp.Unnest):
-                    ancestor_identifier = unnest_to_identifier.get(unnest_ancestor)
-                    if (
-                        ancestor_identifier
-                        and ancestor_identifier.name.lower() == unnest_identifier.name.lower()
-                    ):
-                        continue
-
-                table = unnest_identifier
-
-            column.set("table", table and table.copy())
-
-    return expression
+    pass
 
 
 def _eliminate_dot_variant_lookup(expression: exp.Expr) -> exp.Expr:
-    if isinstance(expression, exp.Select):
-        # This transformation is used to facilitate transpilation of BigQuery `UNNEST` operations
-        # to Snowflake. It should not affect roundtrip because `Unnest` nodes cannot be produced
-        # by Snowflake's parser.
-        #
-        # Additionally, at the time of writing this, BigQuery is the only dialect that produces a
-        # `TableAlias` node that only fills `columns` and not `this`, due to `UNNEST_COLUMN_ONLY`.
-        unnest_aliases = set()
-        for unnest in find_all_in_scope(expression, exp.Unnest):
-            unnest_alias = unnest.args.get("alias")
-            if (
-                isinstance(unnest_alias, exp.TableAlias)
-                and not unnest_alias.this
-                and len(unnest_alias.columns) == 1
-            ):
-                unnest_aliases.add(unnest_alias.columns[0].name)
-
-        if unnest_aliases:
-            for c in find_all_in_scope(expression, exp.Column):
-                if c.table in unnest_aliases:
-                    bracket_lhs = c.args["table"]
-                    bracket_rhs = exp.Literal.string(c.name)
-                    bracket = exp.Bracket(this=bracket_lhs, expressions=[bracket_rhs])
-
-                    if c.parent is expression:
-                        # Retain column projection names by using aliases
-                        c.replace(exp.alias_(bracket, c.this.copy()))
-                    else:
-                        c.replace(bracket)
-
-    return expression
+    pass
 
 
 class SnowflakeGenerator(generator.Generator):
@@ -612,24 +340,10 @@ class SnowflakeGenerator(generator.Generator):
     }
 
     def sortarray_sql(self, expression: exp.SortArray) -> str:
-        asc = expression.args.get("asc")
-        nulls_first = expression.args.get("nulls_first")
-        if asc == exp.false() and nulls_first == exp.true():
-            nulls_first = None
-        return self.func("ARRAY_SORT", expression.this, asc, nulls_first)
+        pass
 
     def nthvalue_sql(self, expression: exp.NthValue) -> str:
-        result = self.func("NTH_VALUE", expression.this, expression.args.get("offset"))
-
-        from_first = expression.args.get("from_first")
-
-        if from_first is not None:
-            if from_first:
-                result = result + " FROM FIRST"
-            else:
-                result = result + " FROM LAST"
-
-        return result
+        pass
 
     SUPPORTED_JSON_PATH_PARTS = {
         exp.JSONPathKey,
@@ -670,75 +384,22 @@ class SnowflakeGenerator(generator.Generator):
     RESPECT_IGNORE_NULLS_UNSUPPORTED_EXPRESSIONS = (exp.ArrayAgg,)
 
     def with_properties(self, properties: exp.Properties) -> str:
-        return self.properties(properties, wrapped=False, prefix=self.sep(""), sep=" ")
+        pass
 
     def values_sql(self, expression: exp.Values, values_as_table: bool = True) -> str:
-        if expression.find(*self.UNSUPPORTED_VALUES_EXPRESSIONS):
-            values_as_table = False
-
-        return super().values_sql(expression, values_as_table=values_as_table)
+        pass
 
     def datatype_sql(self, expression: exp.DataType) -> str:
         # Check if this is a FLOAT type nested inside a VECTOR type
         # VECTOR only accepts FLOAT (not DOUBLE), INT, and STRING as element types
         # https://docs.snowflake.com/en/sql-reference/data-types-vector
-        if expression.is_type(exp.DType.DOUBLE):
-            parent = expression.parent
-            if isinstance(parent, exp.DataType) and parent.is_type(exp.DType.VECTOR):
-                # Preserve FLOAT for VECTOR types instead of mapping to synonym DOUBLE
-                return "FLOAT"
-
-        expressions = expression.expressions
-        if expressions and expression.is_type(*exp.DataType.STRUCT_TYPES):
-            for field_type in expressions:
-                # The correct syntax is OBJECT [ (<key> <value_type [NOT NULL] [, ...]) ]
-                if isinstance(field_type, exp.DataType):
-                    return "OBJECT"
-                if (
-                    isinstance(field_type, exp.ColumnDef)
-                    and field_type.this
-                    and field_type.this.is_string
-                ):
-                    # Doing OBJECT('foo' VARCHAR) is invalid snowflake Syntax. Moreover, besides
-                    # converting 'foo' into an identifier, we also need to quote it because these
-                    # keys are case-sensitive. For example:
-                    #
-                    # WITH t AS (SELECT OBJECT_CONSTRUCT('x', 'y') AS c) SELECT c:x FROM t -- correct
-                    # WITH t AS (SELECT OBJECT_CONSTRUCT('x', 'y') AS c) SELECT c:X FROM t -- incorrect, returns NULL
-                    field_type.this.replace(exp.to_identifier(field_type.name, quoted=True))
-
-        return super().datatype_sql(expression)
+        pass
 
     def tonumber_sql(self, expression: exp.ToNumber) -> str:
-        precision = expression.args.get("precision")
-        scale = expression.args.get("scale")
-
-        default_precision = isinstance(precision, exp.Literal) and precision.name == "38"
-        default_scale = isinstance(scale, exp.Literal) and scale.name == "0"
-
-        if default_precision and default_scale:
-            precision = None
-            scale = None
-        elif default_scale:
-            scale = None
-
-        func_name = "TRY_TO_NUMBER" if expression.args.get("safe") else "TO_NUMBER"
-
-        return self.func(
-            func_name,
-            expression.this,
-            expression.args.get("format"),
-            precision,
-            scale,
-        )
+        pass
 
     def timestampfromparts_sql(self, expression: exp.TimestampFromParts) -> str:
-        milli = expression.args.get("milli")
-        if milli is not None:
-            milli_to_nano = milli.pop() * exp.Literal.number(1000000)
-            expression.set("nano", milli_to_nano)
-
-        return rename_func("TIMESTAMP_FROM_PARTS")(self, expression)
+        pass
 
     def cast_sql(self, expression: exp.Cast, safe_prefix: str | None = None) -> str:
         if expression.is_type(exp.DType.GEOGRAPHY):
@@ -765,72 +426,19 @@ class SnowflakeGenerator(generator.Generator):
         return self.cast_sql(expression)
 
     def log_sql(self, expression: exp.Log) -> str:
-        if not expression.expression:
-            return self.func("LN", expression.this)
-
-        return super().log_sql(expression)
+        pass
 
     def greatest_sql(self, expression: exp.Greatest) -> str:
-        name = "GREATEST_IGNORE_NULLS" if expression.args.get("ignore_nulls") else "GREATEST"
-        return self.func(name, expression.this, *expression.expressions)
+        pass
 
     def least_sql(self, expression: exp.Least) -> str:
-        name = "LEAST_IGNORE_NULLS" if expression.args.get("ignore_nulls") else "LEAST"
-        return self.func(name, expression.this, *expression.expressions)
+        pass
 
     def generator_sql(self, expression: exp.Generator) -> str:
-        args = []
-        rowcount = expression.args.get("rowcount")
-        timelimit = expression.args.get("timelimit")
-
-        if rowcount:
-            args.append(exp.Kwarg(this=exp.var("ROWCOUNT"), expression=rowcount))
-        if timelimit:
-            args.append(exp.Kwarg(this=exp.var("TIMELIMIT"), expression=timelimit))
-
-        return self.func("GENERATOR", *args)
+        pass
 
     def unnest_sql(self, expression: exp.Unnest) -> str:
-        unnest_alias = expression.args.get("alias")
-        offset = expression.args.get("offset")
-
-        unnest_alias_columns = unnest_alias.columns if unnest_alias else []
-        value = seq_get(unnest_alias_columns, 0) or exp.to_identifier("value")
-
-        columns = [
-            exp.to_identifier("seq"),
-            exp.to_identifier("key"),
-            exp.to_identifier("path"),
-            offset.pop() if isinstance(offset, exp.Expr) else exp.to_identifier("index"),
-            value,
-            exp.to_identifier("this"),
-        ]
-
-        if unnest_alias:
-            unnest_alias.set("columns", columns)
-        else:
-            unnest_alias = exp.TableAlias(this="_u", columns=columns)
-
-        table_input = self.sql(expression.expressions[0])
-        if not table_input.startswith("INPUT =>"):
-            table_input = f"INPUT => {table_input}"
-
-        expression_parent = expression.parent
-
-        explode = (
-            f"FLATTEN({table_input})"
-            if isinstance(expression_parent, exp.Lateral)
-            else f"TABLE(FLATTEN({table_input}))"
-        )
-        alias = self.sql(unnest_alias)
-        alias = f" AS {alias}" if alias else ""
-        value = (
-            ""
-            if isinstance(expression_parent, (exp.From, exp.Join, exp.Lateral))
-            else f"{value} FROM "
-        )
-
-        return f"{value}{explode}{alias}"
+        pass
 
     def show_sql(self, expression: exp.Show) -> str:
         terse = "TERSE " if expression.args.get("terse") else ""
@@ -899,236 +507,67 @@ class SnowflakeGenerator(generator.Generator):
         return f"AUTOINCREMENT{start}{increment}{order_clause}"
 
     def cluster_sql(self, expression: exp.Cluster) -> str:
-        return f"CLUSTER BY ({self.expressions(expression, flat=True)})"
+        pass
 
     def struct_sql(self, expression: exp.Struct) -> str:
-        if len(expression.expressions) == 1:
-            arg = expression.expressions[0]
-            if arg.is_star or (isinstance(arg, exp.ILike) and arg.left.is_star):
-                # Wildcard syntax: https://docs.snowflake.com/en/sql-reference/data-types-semistructured#object
-                return f"{{{self.sql(expression.expressions[0])}}}"
-
-        keys = []
-        values = []
-
-        for i, e in enumerate(expression.expressions):
-            if isinstance(e, exp.PropertyEQ):
-                keys.append(
-                    exp.Literal.string(e.name) if isinstance(e.this, exp.Identifier) else e.this
-                )
-                values.append(e.expression)
-            else:
-                keys.append(exp.Literal.string(f"_{i}"))
-                values.append(e)
-
-        return self.func("OBJECT_CONSTRUCT", *flatten(zip(keys, values)))
+        pass
 
     @unsupported_args("weight", "accuracy")
     def approxquantile_sql(self, expression: exp.ApproxQuantile) -> str:
-        return self.func("APPROX_PERCENTILE", expression.this, expression.args.get("quantile"))
+        pass
 
     def alterset_sql(self, expression: exp.AlterSet) -> str:
-        exprs = self.expressions(expression, flat=True)
-        exprs = f" {exprs}" if exprs else ""
-        file_format = self.expressions(expression, key="file_format", flat=True, sep=" ")
-        file_format = f" STAGE_FILE_FORMAT = ({file_format})" if file_format else ""
-        copy_options = self.expressions(expression, key="copy_options", flat=True, sep=" ")
-        copy_options = f" STAGE_COPY_OPTIONS = ({copy_options})" if copy_options else ""
-        tag = self.expressions(expression, key="tag", flat=True)
-        tag = f" TAG {tag}" if tag else ""
-
-        return f"SET{exprs}{file_format}{copy_options}{tag}"
+        pass
 
     def strtotime_sql(self, expression: exp.StrToTime):
         # target_type is stored as a DataType instance
-        target_type = expression.args.get("target_type")
-
-        # Get the type enum from DataType instance or from type annotation
-        if isinstance(target_type, exp.DataType):
-            type_enum = target_type.this
-        elif expression.type:
-            type_enum = expression.type.this
-        else:
-            type_enum = exp.DType.TIMESTAMP
-
-        func_name = TIMESTAMP_TYPES.get(type_enum, "TO_TIMESTAMP")
-
-        return self.func(
-            f"{'TRY_' if expression.args.get('safe') else ''}{func_name}",
-            expression.this,
-            self.format_time(expression),
-        )
+        pass
 
     def timestampsub_sql(self, expression: exp.TimestampSub):
-        return self.sql(
-            exp.TimestampAdd(
-                this=expression.this,
-                expression=expression.expression * -1,
-                unit=expression.unit,
-            )
-        )
+        pass
 
     def jsonextract_sql(self, expression: exp.JSONExtract):
-        this = expression.this
-
-        # JSON strings are valid coming from other dialects such as BQ so
-        # for these cases we PARSE_JSON preemptively
-        if not isinstance(this, (exp.ParseJSON, exp.JSONExtract)) and not expression.args.get(
-            "requires_json"
-        ):
-            this = exp.ParseJSON(this=this)
-
-        return self.func(
-            "GET_PATH",
-            this,
-            expression.expression,
-        )
+        pass
 
     def timetostr_sql(self, expression: exp.TimeToStr) -> str:
-        this = expression.this
-        if this.is_string:
-            this = exp.cast(this, exp.DType.TIMESTAMP)
-
-        return self.func("TO_CHAR", this, self.format_time(expression))
+        pass
 
     def datesub_sql(self, expression: exp.DateSub) -> str:
-        value = expression.expression
-        if value:
-            value.replace(value * (-1))
-        else:
-            self.unsupported("DateSub cannot be transpiled if the subtracted count is unknown")
-
-        return date_delta_sql("DATEADD")(self, expression)
+        pass
 
     def select_sql(self, expression: exp.Select) -> str:
-        limit = expression.args.get("limit")
-        offset = expression.args.get("offset")
-        if offset and not limit:
-            expression.limit(exp.Null(), copy=False)
-        return super().select_sql(expression)
+        pass
 
     def createable_sql(self, expression: exp.Create, locations: defaultdict) -> str:
-        is_materialized = expression.find(exp.MaterializedProperty)
-        copy_grants_property = expression.find(exp.CopyGrantsProperty)
-
-        if expression.kind == "VIEW" and is_materialized and copy_grants_property:
-            # For materialized views, COPY GRANTS is located *before* the columns list
-            # This is in contrast to normal views where COPY GRANTS is located *after* the columns list
-            # We default CopyGrantsProperty to POST_SCHEMA which means we need to output it POST_NAME if a materialized view is detected
-            # ref: https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view#syntax
-            # ref: https://docs.snowflake.com/en/sql-reference/sql/create-view#syntax
-            post_schema_properties = locations[exp.Properties.Location.POST_SCHEMA]
-            post_schema_properties.pop(post_schema_properties.index(copy_grants_property))
-
-            this_name = self.sql(expression.this, "this")
-            copy_grants = self.sql(copy_grants_property)
-            this_schema = self.schema_columns_sql(expression.this)
-            this_schema = f"{self.sep()}{this_schema}" if this_schema else ""
-
-            return f"{this_name}{self.sep()}{copy_grants}{this_schema}"
-
-        return super().createable_sql(expression, locations)
+        pass
 
     def arrayagg_sql(self, expression: exp.ArrayAgg) -> str:
-        this = expression.this
-
-        # If an ORDER BY clause is present, we need to remove it from ARRAY_AGG
-        # and add it later as part of the WITHIN GROUP clause
-        order = this if isinstance(this, exp.Order) else None
-        if order:
-            expression.set("this", order.this.pop())
-
-        expr_sql = super().arrayagg_sql(expression)
-
-        if order:
-            expr_sql = self.sql(exp.WithinGroup(this=expr_sql, expression=order))
-
-        return expr_sql
+        pass
 
     def arraytostring_sql(self, expression: exp.ArrayToString) -> str:
-        return self.func("ARRAY_TO_STRING", expression.this, expression.expression)
+        pass
 
     def array_sql(self, expression: exp.Array) -> str:
-        expressions = expression.expressions
-
-        first_expr = seq_get(expressions, 0)
-        if isinstance(first_expr, exp.Select):
-            # SELECT AS STRUCT foo AS alias_foo -> ARRAY_AGG(OBJECT_CONSTRUCT('alias_foo', foo))
-            if first_expr.text("kind").upper() == "STRUCT":
-                object_construct_args = []
-                for expr in first_expr.expressions:
-                    # Alias case: SELECT AS STRUCT foo AS alias_foo -> OBJECT_CONSTRUCT('alias_foo', foo)
-                    # Column case: SELECT AS STRUCT foo -> OBJECT_CONSTRUCT('foo', foo)
-                    name = expr.this if isinstance(expr, exp.Alias) else expr
-
-                    object_construct_args.extend([exp.Literal.string(expr.alias_or_name), name])
-
-                array_agg = exp.ArrayAgg(this=build_object_construct(args=object_construct_args))
-
-                first_expr.set("kind", None)
-                first_expr.set("expressions", [array_agg])
-
-                return self.sql(first_expr.subquery())
-
-        return inline_array_sql(self, expression)
+        pass
 
     def currentdate_sql(self, expression: exp.CurrentDate) -> str:
-        zone = self.sql(expression, "this")
-        if not zone:
-            return super().currentdate_sql(expression)
-
-        expr = exp.Cast(
-            this=exp.ConvertTimezone(target_tz=zone, timestamp=exp.CurrentTimestamp()),
-            to=exp.DataType(this=exp.DType.DATE),
-        )
-        return self.sql(expr)
+        pass
 
     def dot_sql(self, expression: exp.Dot) -> str:
-        this = expression.this
-
-        if not this.type:
-            from sqlglot.optimizer.annotate_types import annotate_types
-
-            this = annotate_types(this, dialect=self.dialect)
-
-        if not isinstance(this, exp.Dot) and this.is_type(exp.DType.STRUCT):
-            # Generate colon notation for the top level STRUCT
-            return f"{self.sql(this)}:{self.sql(expression, 'expression')}"
-
-        return super().dot_sql(expression)
+        pass
 
     def modelattribute_sql(self, expression: exp.ModelAttribute) -> str:
-        return f"{self.sql(expression, 'this')}!{self.sql(expression, 'expression')}"
+        pass
 
     def format_sql(self, expression: exp.Format) -> str:
-        if expression.name.lower() == "%s" and len(expression.expressions) == 1:
-            return self.func("TO_CHAR", expression.expressions[0])
-
-        return self.function_fallback_sql(expression)
+        pass
 
     def splitpart_sql(self, expression: exp.SplitPart) -> str:
         # Set part_index to 1 if missing
-        if not expression.args.get("delimiter"):
-            expression.set("delimiter", exp.Literal.string(" "))
-
-        if not expression.args.get("part_index"):
-            expression.set("part_index", exp.Literal.number(1))
-
-        return rename_func("SPLIT_PART")(self, expression)
+        pass
 
     def uniform_sql(self, expression: exp.Uniform) -> str:
-        gen = expression.args.get("gen")
-        seed = expression.args.get("seed")
-
-        # From Databricks UNIFORM(min, max, seed) -> Wrap gen in RANDOM(seed)
-        if seed:
-            gen = exp.Rand(this=seed)
-
-        # No gen argument (from Databricks 2-arg UNIFORM(min, max)) -> Add RANDOM()
-        if not gen:
-            gen = exp.Rand()
-
-        return self.func("UNIFORM", expression.this, expression.expression, gen)
+        pass
 
     def window_sql(self, expression: exp.Window) -> str:
         spec = expression.args.get("spec")

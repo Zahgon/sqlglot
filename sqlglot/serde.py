@@ -20,54 +20,7 @@ def dump(expression: exp.Expr) -> list[dict[str, t.Any]]:
     """
     Dump an Expr into a JSON serializable List.
     """
-    i = 0
-    payloads = []
-    stack: list[tuple[t.Any, int | None, str | None, bool]] = [(expression, None, None, False)]
-
-    while stack:
-        node, index, arg_key, is_array = stack.pop()
-
-        payload: dict[str, t.Any] = {}
-
-        if index is not None:
-            payload[INDEX] = index
-        if arg_key is not None:
-            payload[ARG_KEY] = arg_key
-        if is_array:
-            payload[IS_ARRAY] = is_array
-
-        payloads.append(payload)
-
-        if hasattr(node, "parent"):
-            klass = node.__class__.__qualname__
-
-            if node.__class__.__module__ != exp.__name__:
-                klass = f"{node.__module__}.{klass}"
-
-            payload[CLASS] = klass
-
-            if node.type:
-                payload[TYPE] = dump(node.type)
-            if node.comments:
-                payload[COMMENTS] = node.comments
-            if node._meta is not None:
-                payload[META] = node._meta
-            if node.args:
-                for k, vs in reversed(node.args.items()):
-                    if type(vs) is list:
-                        for v in reversed(vs):
-                            stack.append((v, i, k, True))
-                    elif vs is not None:
-                        stack.append((vs, i, k, False))
-        elif type(node) is exp.DType:
-            payload[CLASS] = DATA_TYPE
-            payload[VALUE] = node.value
-        else:
-            payload[VALUE] = node
-
-        i += 1
-
-    return payloads
+    pass
 
 
 def load(

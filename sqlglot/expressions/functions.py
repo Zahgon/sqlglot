@@ -44,15 +44,15 @@ class Cast(Expression, Func):
 
     @property
     def name(self) -> str:
-        return self.this.name
+        pass
 
     @property
     def to(self) -> DataType:
-        return self.args["to"]
+        pass
 
     @property
     def output_name(self) -> str:
-        return self.name
+        pass
 
     def is_type(self, *dtypes: DATA_TYPE) -> bool:
         """

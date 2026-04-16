@@ -115,8 +115,7 @@ class Schema(abc.ABC):
         Returns:
             True if the column appears in the schema, False otherwise.
         """
-        name = column if isinstance(column, str) else column.name
-        return name in self.column_names(table, dialect=dialect, normalize=normalize)
+        pass
 
     def get_udf_type(
         self,
@@ -147,7 +146,7 @@ class Schema(abc.ABC):
     @property
     def empty(self) -> bool:
         """Returns whether the schema is empty."""
-        return True
+        pass
 
 
 class AbstractMappingSchema:
@@ -169,27 +168,17 @@ class AbstractMappingSchema:
 
     @property
     def empty(self) -> bool:
-        return not self.mapping
+        pass
 
     def depth(self) -> int:
-        return dict_depth(self.mapping)
+        pass
 
     def udf_depth(self) -> int:
         return dict_depth(self.udf_mapping)
 
     @property
     def supported_table_args(self) -> tuple[str, ...]:
-        if not self._supported_table_args and self.mapping:
-            depth = self.depth()
-
-            if not depth:  # None
-                self._supported_table_args = tuple()
-            elif 1 <= depth <= 3:
-                self._supported_table_args = exp.TABLE_PARTS[:depth]
-            else:
-                raise SchemaError(f"Invalid mapping shape. Depth: {depth}")
-
-        return self._supported_table_args
+        pass
 
     def table_parts(self, table: exp.Table) -> list[str]:
         return [p.name for p in reversed(table.parts)]
@@ -259,17 +248,7 @@ class AbstractMappingSchema:
         Returns:
             The return type of the UDF, or None if not found.
         """
-        parts = self.udf_parts(udf)
-        resolved_parts = self._find_in_trie(parts, self.udf_trie, raise_on_missing)
-
-        if resolved_parts is None:
-            return None
-
-        return nested_get(
-            self.udf_mapping,
-            *zip(resolved_parts, reversed(resolved_parts)),
-            raise_on_missing=raise_on_missing,
-        )
+        pass
 
     def nested_get(
         self,
@@ -333,13 +312,7 @@ class MappingSchema(AbstractMappingSchema, Schema):
 
     @classmethod
     def from_mapping_schema(cls, mapping_schema: MappingSchema) -> MappingSchema:
-        return MappingSchema(
-            schema=mapping_schema.mapping,
-            visible=mapping_schema.visible,
-            dialect=mapping_schema.dialect,
-            normalize=mapping_schema.normalize,
-            udf_mapping=mapping_schema.udf_mapping,
-        )
+        pass
 
     def find(
         self, table: exp.Table, raise_on_missing: bool = True, ensure_data_types: bool = False
@@ -386,27 +359,7 @@ class MappingSchema(AbstractMappingSchema, Schema):
             normalize: whether to normalize identifiers according to the dialect of interest.
             match_depth: whether to enforce that the table must match the schema's depth or not.
         """
-        normalized_table = self._normalize_table(table, dialect=dialect, normalize=normalize)
-
-        if match_depth and not self.empty and len(normalized_table.parts) != self.depth():
-            raise SchemaError(
-                f"Table {normalized_table.sql(dialect=self.dialect)} must match the "
-                f"schema's nesting level: {self.depth()}."
-            )
-
-        normalized_column_mapping = {
-            self._normalize_name(key, dialect=dialect, normalize=normalize): value
-            for key, value in ensure_column_mapping(column_mapping).items()
-        }
-
-        schema = self.find(normalized_table, raise_on_missing=False)
-        if schema and not normalized_column_mapping:
-            return
-
-        parts = self.table_parts(normalized_table)
-
-        nested_set(self.mapping, tuple(reversed(parts)), normalized_column_mapping)
-        new_trie([parts], self.mapping_trie)
+        pass
 
     def column_names(
         self,
@@ -494,14 +447,7 @@ class MappingSchema(AbstractMappingSchema, Schema):
         dialect: DialectType = None,
         normalize: bool | None = None,
     ) -> bool:
-        normalized_table = self._normalize_table(table, dialect=dialect, normalize=normalize)
-
-        normalized_column_name = self._normalize_name(
-            column if isinstance(column, str) else column.this, dialect=dialect, normalize=normalize
-        )
-
-        table_schema = self.find(normalized_table, raise_on_missing=False)
-        return normalized_column_name in table_schema if table_schema else False
+        pass
 
     def _normalize(self, schema: dict[str, object]) -> dict[str, object]:
         """
@@ -513,33 +459,7 @@ class MappingSchema(AbstractMappingSchema, Schema):
         Returns:
             The normalized schema mapping.
         """
-        normalized_mapping: dict[str, object] = {}
-        flattened_schema = flatten_schema(schema)
-        error_msg = "Table {} must match the schema's nesting level: {}."
-
-        for keys in flattened_schema:
-            columns = nested_get(schema, *zip(keys, keys))
-
-            if not isinstance(columns, dict):
-                raise SchemaError(error_msg.format(".".join(keys[:-1]), len(flattened_schema[0])))
-            if not columns:
-                raise SchemaError(f"Table {'.'.join(keys[:-1])} must have at least one column")
-            if isinstance(first(columns.values()), dict):
-                raise SchemaError(
-                    error_msg.format(
-                        ".".join(keys + flatten_schema(columns)[0]), len(flattened_schema[0])
-                    ),
-                )
-
-            normalized_keys = [self._normalize_name(key, is_table=True) for key in keys]
-            for column_name, column_type in columns.items():
-                nested_set(
-                    normalized_mapping,
-                    normalized_keys + [self._normalize_name(column_name)],
-                    column_type,
-                )
-
-        return normalized_mapping
+        pass
 
     def _normalize_udfs(self, udfs: dict[str, object]) -> dict[str, object]:
         """
@@ -551,14 +471,7 @@ class MappingSchema(AbstractMappingSchema, Schema):
         Returns:
             The normalized UDF mapping.
         """
-        normalized_mapping: dict[str, object] = {}
-
-        for keys in flatten_schema(udfs, depth=dict_depth(udfs)):
-            udf_type = nested_get(udfs, *zip(keys, keys))
-            normalized_keys = [self._normalize_name(key, is_table=True) for key in keys]
-            nested_set(normalized_mapping, normalized_keys, udf_type)
-
-        return normalized_mapping
+        pass
 
     def _normalize_udf(
         self,
@@ -651,10 +564,7 @@ class MappingSchema(AbstractMappingSchema, Schema):
         return result
 
     def depth(self) -> int:
-        if not self.empty and not self._depth:
-            # The columns themselves are a mapping, but we don't want to include those
-            self._depth = super().depth() - 1
-        return self._depth
+        pass
 
     def _to_data_type(self, schema_type: str, dialect: DialectType = None) -> exp.DataType:
         """
@@ -709,20 +619,7 @@ def ensure_schema(
 
 
 def ensure_column_mapping(mapping: ColumnMapping | None) -> dict:
-    if mapping is None:
-        return {}
-    elif isinstance(mapping, dict):
-        return mapping
-    elif isinstance(mapping, str):
-        col_name_type_strs = [x.strip() for x in mapping.split(",")]
-        return {
-            name_type_str.split(":")[0].strip(): name_type_str.split(":")[1].strip()
-            for name_type_str in col_name_type_strs
-        }
-    elif isinstance(mapping, list):
-        return {x.strip(): None for x in mapping}
-
-    raise ValueError(f"Invalid mapping provided: {type(mapping)}")
+    pass
 
 
 def flatten_schema(
