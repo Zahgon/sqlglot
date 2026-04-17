@@ -276,7 +276,14 @@ class _Dialect(type):
         )[0]
 
         def get_start_end(token_type: TokenType) -> tuple[str | None, str | None]:
-            pass
+            return next(
+                (
+                    (s, e)
+                    for s, (e, t) in klass.tokenizer_class._FORMAT_STRINGS.items()
+                    if t == token_type
+                ),
+                (None, None),
+            )
 
         klass.BIT_START, klass.BIT_END = get_start_end(TokenType.BIT_STRING)
         klass.HEX_START, klass.HEX_END = get_start_end(TokenType.HEX_STRING)
